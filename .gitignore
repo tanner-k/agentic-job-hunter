@@ -1,0 +1,32 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Personal data (never commit)
+worker/personal/
+credentials.json
+token.json
+.env
+
+# Supabase local
+.supabase/
+
+# Screenshots (captured by browser_tool on failure)
+worker/screenshots/
+!worker/screenshots/.gitkeep
+
+# Session / handoff notes (private)
+HANDOFF.md
+
+# Exploratory notebooks (not part of framework)
+agent_search.ipynb
+
+# Legacy root entrypoint (replaced by worker module)
+main.py
