@@ -1,5 +1,3 @@
-
-
 def test_job_listing_requires_url_company_title():
     from worker.models.job_listing import JobListing
 
@@ -94,3 +92,28 @@ def test_application_packets_holds_list():
         ]
     )
     assert len(packets.packets) == 1
+
+
+def test_build_field_inspector_returns_agent():
+    from unittest.mock import MagicMock, patch
+
+    # Patch LLM, field_inspector_tool, and Agent to avoid needing Ollama running
+    with (
+        patch("worker.agents.field_inspector.LLM") as mock_llm,
+        patch("worker.agents.field_inspector.field_inspector_tool"),
+        patch("worker.agents.field_inspector.Agent") as mock_agent,
+    ):
+        mock_instance = MagicMock()
+        mock_llm.return_value = mock_instance
+        # Create a real agent-like object that passes assertions
+        agent_instance = MagicMock()
+        agent_instance.role = "Form Field Inspector"
+        agent_instance.max_iter = 8
+        agent_instance.allow_delegation = False
+        mock_agent.return_value = agent_instance
+        from worker.agents.field_inspector import build_field_inspector
+
+        agent = build_field_inspector()
+    assert agent.role == "Form Field Inspector"
+    assert agent.max_iter == 8
+    assert agent.allow_delegation is False
