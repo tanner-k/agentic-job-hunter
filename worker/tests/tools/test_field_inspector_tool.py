@@ -122,3 +122,35 @@ def test_tool_returns_empty_on_playwright_error():
     assert data["form_fields"] == []
     assert data["requires_resume"] is False
     assert "error" in data
+
+
+def test_tool_falls_back_to_domcontentloaded_on_networkidle_timeout():
+    from worker.tools.field_inspector_tool import field_inspector_tool
+
+    mock_page = _make_page(labels=["Email"], file_inputs=0)
+
+    call_count = 0
+
+    def goto_side_effect(url, wait_until, timeout):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise Exception("networkidle timeout")
+        # second call succeeds silently
+
+    mock_page.goto = goto_side_effect
+
+    with patch("worker.tools.field_inspector_tool.sync_playwright") as mock_pw:
+        mock_browser = MagicMock()
+        mock_context = MagicMock()
+        mock_context.new_page.return_value = mock_page
+        mock_browser.new_context.return_value = mock_context
+        mock_pw.return_value.__enter__.return_value.chromium.launch.return_value = (
+            mock_browser
+        )
+
+        result = field_inspector_tool.run("https://example.com")
+
+    data = json.loads(result)
+    assert call_count == 2
+    assert "Email" in data["form_fields"]

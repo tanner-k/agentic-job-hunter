@@ -97,9 +97,11 @@ def field_inspector_tool(url: str) -> str:
             except Exception:
                 page.goto(url, wait_until="domcontentloaded", timeout=20_000)
 
-            fields = _extract_fields(page)
-            requires_resume = page.locator("input[type=file]").count() > 0
-            browser.close()
+            try:
+                fields = _extract_fields(page)
+                requires_resume = page.locator("input[type=file]").count() > 0
+            finally:
+                browser.close()
 
         result = {"url": url, "form_fields": fields, "requires_resume": requires_resume}
         logger.info("fields_extracted", url=url, field_count=len(fields))
