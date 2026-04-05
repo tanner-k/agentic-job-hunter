@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createSearchTask } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,24 +18,10 @@ export default function SearchPage() {
     setSuccess(false);
     setError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const keywordsRaw = formData.get("keywords") as string;
-    const keywords = keywordsRaw
-      ? keywordsRaw.split(",").map((k) => k.trim()).filter(Boolean)
-      : [];
-
-    const supabase = createClient();
-    const { error: insertError } = await supabase.from("search_tasks").insert({
-      job_title: formData.get("job_title") as string,
-      location: formData.get("location") as string,
-      min_salary: parseInt(formData.get("min_salary") as string) || null,
-      keywords,
-      company: formData.get("company") as string || null,
-      job_website: formData.get("job_website") as string || null,
-    });
+    const { error: insertError } = await createSearchTask(new FormData(e.currentTarget));
 
     if (insertError) {
-      setError(insertError.message);
+      setError(insertError);
     } else {
       setSuccess(true);
       (e.target as HTMLFormElement).reset();
