@@ -88,7 +88,10 @@ def _inspector_work(url: str) -> str:
     """
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
             context = browser.new_context(
                 viewport={"width": 1280, "height": 800},
                 user_agent=_USER_AGENT,

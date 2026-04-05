@@ -48,7 +48,11 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
     _SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, slow_mo=50)
+        browser = p.chromium.launch(
+            headless=True,
+            slow_mo=50,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
         context = browser.new_context(
             viewport={"width": 1280, "height": 800},
             user_agent=(
