@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "crewai>=1.12.2",
-    "duckduckgo-search>=8.1.1",
+    "ddgs>=9.0.0",
     "google-api-python-client>=2.0.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.0.0",
