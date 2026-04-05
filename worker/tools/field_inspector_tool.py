@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from crewai.tools import tool
 from playwright.sync_api import Page, sync_playwright
@@ -78,12 +79,12 @@ def _extract_fields(page: Page) -> list[str]:
     return fields
 
 
-@tool("Field Inspector")
-def field_inspector_tool(url: str) -> str:
-    """Visit a job application URL and extract the names of all visible form fields.
+def _inspector_work(url: str) -> str:
+    """Run all Playwright logic in a thread (no asyncio loop — sync_playwright safe).
 
-    Returns a JSON string with keys: url, form_fields (list of label strings),
-    requires_resume (bool). On any error returns empty form_fields with an error key.
+    Extracted from field_inspector_tool so it can be submitted to ThreadPoolExecutor,
+    which avoids the "Playwright Sync API inside asyncio loop" error raised when
+    CrewAI invokes tools from within its asyncio event loop.
     """
     try:
         with sync_playwright() as p:
@@ -121,3 +122,39 @@ def field_inspector_tool(url: str) -> str:
                 "error": str(exc),
             }
         )
+
+
+@tool("Field Inspector")
+def field_inspector_tool(url: str) -> str:
+    """Visit a job application URL and extract the names of all visible form fields.
+
+    Returns a JSON string with keys: url, form_fields (list of label strings),
+    requires_resume (bool). On any error returns empty form_fields with an error key.
+
+    Runs all Playwright operations in a ThreadPoolExecutor so they are isolated
+    from CrewAI's asyncio event loop (sync_playwright cannot run inside a loop).
+    """
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_inspector_work, url)
+        try:
+            return future.result(timeout=90)
+        except TimeoutError:
+            logger.error("inspector_timeout", url=url)
+            return json.dumps(
+                {
+                    "url": url,
+                    "form_fields": [],
+                    "requires_resume": False,
+                    "error": "Field inspection timed out after 90 seconds",
+                }
+            )
+        except Exception as exc:
+            logger.error("inspector_executor_error", url=url, error=str(exc))
+            return json.dumps(
+                {
+                    "url": url,
+                    "form_fields": [],
+                    "requires_resume": False,
+                    "error": f"Inspector execution error: {exc}",
+                }
+            )

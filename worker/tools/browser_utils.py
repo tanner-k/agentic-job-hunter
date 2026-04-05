@@ -10,12 +10,17 @@ logger = get_logger(__name__)
 
 # Ordered from most specific to least specific to minimise false-positive clicks.
 _APPLY_SELECTORS = [
+    # Most specific first to minimise false-positive clicks
     "a:has-text('Apply for this job online')",
     "a:has-text('Apply for this job')",
+    "a:has-text('Apply to Job Online')",
+    "a:has-text('Apply for this position')",
     "a:has-text('Apply Now')",
     "a:has-text('Apply now')",
     "button:has-text('Apply for this job online')",
     "button:has-text('Apply for this job')",
+    "button:has-text('Apply to Job Online')",
+    "button:has-text('Apply for this position')",
     "button:has-text('Apply Now')",
 ]
 

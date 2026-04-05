@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from crewai.tools import tool
@@ -31,9 +32,13 @@ def _load_personal_data() -> dict:
         return json.load(f)
 
 
-@tool("Browser Form Fitter")
-def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str:
-    """Navigates to a URL, fills form fields with personal data, uploads resume, and submits the application autonomously."""
+def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> str:
+    """Run all Playwright logic in a thread (no asyncio loop — sync_playwright safe).
+
+    Extracted from browser_tool so it can be submitted to ThreadPoolExecutor,
+    which avoids the "Playwright Sync API inside asyncio loop" error raised when
+    CrewAI invokes tools from within its asyncio event loop.
+    """
     try:
         form_data = json.loads(json_instructions)
     except json.JSONDecodeError:
@@ -55,7 +60,12 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
         page = context.new_page()
         try:
             logger.info("browser_navigating", url=url)
-            page.goto(url, wait_until="networkidle")
+            # networkidle can time out on pages that keep background XHR alive;
+            # fall back to domcontentloaded so the page is at least rendered.
+            try:
+                page.goto(url, wait_until="networkidle", timeout=30_000)
+            except Exception:
+                page.goto(url, wait_until="domcontentloaded", timeout=20_000)
 
             # If this is a listing page, click through to the actual application form.
             click_through_to_form(page)
@@ -102,7 +112,9 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
                 )
                 page.screenshot(path=str(screenshot_path))
                 logger.warning(
-                    "submit_button_not_found", url=url, screenshot=str(screenshot_path)
+                    "submit_button_not_found",
+                    url=url,
+                    screenshot=str(screenshot_path),
                 )
                 _record_application(
                     url,
@@ -125,12 +137,36 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
             browser.close()
 
 
+@tool("Browser Form Fitter")
+def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str:
+    """Navigate to a job application URL, fill form fields, upload resume, and submit.
+
+    Runs all Playwright operations in a ThreadPoolExecutor so they are isolated
+    from CrewAI's asyncio event loop (sync_playwright cannot run inside a loop).
+    """
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(_browser_work, url, json_instructions, requires_resume)
+        try:
+            return future.result(timeout=120)
+        except TimeoutError:
+            logger.error("browser_timeout", url=url)
+            _record_application(
+                url,
+                requires_resume,
+                status="failed",
+                error="Browser operation timed out",
+            )
+            return f"Browser operation timed out at {url}"
+        except Exception as exc:
+            logger.error("browser_executor_error", url=url, error=str(exc))
+            return f"Browser execution error at {url}: {exc}"
+
+
 def _record_application(
     url: str, requires_resume: bool, status: str, error: str | None = None
 ) -> None:
     """Write the application outcome to Supabase. Best-effort — never raises."""
     try:
-        # Extract a rough company/title from the URL for the DB record
         from urllib.parse import urlparse
 
         from worker.db.repository import insert_application
