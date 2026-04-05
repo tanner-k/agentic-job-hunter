@@ -4,6 +4,7 @@ from crewai.tools import tool
 from playwright.sync_api import Page, sync_playwright
 
 from worker.logging_config import get_logger
+from worker.tools.browser_utils import click_through_to_form
 
 logger = get_logger(__name__)
 
@@ -96,6 +97,9 @@ def field_inspector_tool(url: str) -> str:
                 page.goto(url, wait_until="networkidle", timeout=30_000)
             except Exception:
                 page.goto(url, wait_until="domcontentloaded", timeout=20_000)
+
+            # If this is a listing page, click through to the actual application form.
+            click_through_to_form(page)
 
             try:
                 fields = _extract_fields(page)

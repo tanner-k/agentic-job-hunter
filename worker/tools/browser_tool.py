@@ -6,6 +6,7 @@ from playwright.sync_api import sync_playwright
 
 from worker.config import settings
 from worker.logging_config import get_logger
+from worker.tools.browser_utils import click_through_to_form
 
 logger = get_logger(__name__)
 
@@ -56,6 +57,9 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
             logger.info("browser_navigating", url=url)
             page.goto(url, wait_until="networkidle")
 
+            # If this is a listing page, click through to the actual application form.
+            click_through_to_form(page)
+
             # Fill form fields
             for field_name, value in form_data.items():
                 logger.debug("filling_field", field=field_name)
@@ -93,10 +97,19 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
                 _record_application(url, requires_resume, status="applied")
                 return f"Successfully submitted application at {url}"
             else:
-                screenshot_path = _SCREENSHOTS_DIR / f"no_submit_{hash(url) & 0xFFFF}.png"
+                screenshot_path = (
+                    _SCREENSHOTS_DIR / f"no_submit_{hash(url) & 0xFFFF}.png"
+                )
                 page.screenshot(path=str(screenshot_path))
-                logger.warning("submit_button_not_found", url=url, screenshot=str(screenshot_path))
-                _record_application(url, requires_resume, status="failed", error=f"No submit button found. Screenshot: {screenshot_path}")
+                logger.warning(
+                    "submit_button_not_found", url=url, screenshot=str(screenshot_path)
+                )
+                _record_application(
+                    url,
+                    requires_resume,
+                    status="failed",
+                    error=f"No submit button found. Screenshot: {screenshot_path}",
+                )
                 return f"Could not find Submit button at {url}. Screenshot: {screenshot_path}"
 
         except Exception as exc:
@@ -112,14 +125,17 @@ def browser_tool(url: str, json_instructions: str, requires_resume: bool) -> str
             browser.close()
 
 
-def _record_application(url: str, requires_resume: bool, status: str, error: str | None = None) -> None:
+def _record_application(
+    url: str, requires_resume: bool, status: str, error: str | None = None
+) -> None:
     """Write the application outcome to Supabase. Best-effort — never raises."""
     try:
+        # Extract a rough company/title from the URL for the DB record
+        from urllib.parse import urlparse
+
         from worker.db.repository import insert_application
         from worker.models.application_result import ApplicationResult
 
-        # Extract a rough company/title from the URL for the DB record
-        from urllib.parse import urlparse
         domain = urlparse(url).netloc.replace("www.", "")
 
         result = ApplicationResult(
