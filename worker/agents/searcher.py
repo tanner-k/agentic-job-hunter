@@ -1,4 +1,4 @@
-from crewai import Agent, LLM
+from crewai import LLM, Agent
 
 from worker.config import settings
 from worker.tools.search_tool import search_tool
@@ -19,4 +19,5 @@ def build_searcher() -> Agent:
         allow_delegation=False,
         tools=[search_tool],
         llm=llm,
+        max_iter=6,
     )
