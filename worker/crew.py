@@ -10,7 +10,6 @@ from worker.config import settings
 from worker.logging_config import get_logger
 from worker.models.application_packet import ApplicationPackets
 from worker.models.inspected_job import InspectedJobs
-from worker.models.job_listing import SearchResults
 from worker.models.search_criteria import SearchCriteria
 from worker.tools.browser_tool import set_current_task_id
 
@@ -90,9 +89,11 @@ def run_crew(criteria: SearchCriteria, task_id: str | None = None) -> str:
 
     task_search = Task(
         description=_TASK_SEARCH_DESCRIPTION,
-        expected_output="SearchResults JSON with jobs list containing url, company, job_title.",
+        expected_output=(
+            "A plain-text list of up to 5 job listings found. "
+            "For each listing: URL, company name, and job title on separate lines."
+        ),
         agent=searcher,
-        output_pydantic=SearchResults,
     )
     task_inspect = Task(
         description=_TASK_INSPECT_DESCRIPTION,
