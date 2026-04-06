@@ -50,3 +50,6 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["worker/tests"]
 addopts = "-x -q"
+markers = [
+    "integration: full pipeline tests with mocked external I/O",
+]
