@@ -1,5 +1,7 @@
 from pathlib import Path
+from typing import Any
 
+from crewai import LLM
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,7 +21,9 @@ class Settings(BaseSettings):
     # Supabase — required
     supabase_url: str
     supabase_key: str  # anon key — used for regular DB reads/writes
-    supabase_service_role_key: str  # service role key — used by worker's Realtime subscription (bypasses RLS)
+    supabase_service_role_key: (
+        str  # service role key — used by worker's Realtime subscription (bypasses RLS)
+    )
 
     # Local file paths (stay on Mac mini, never uploaded)
     resume_path: Path = Path("./worker/personal/resume.pdf")
@@ -38,8 +42,26 @@ class Settings(BaseSettings):
         ]
     )
 
+    # Browser
+    headless: bool = True
+
     # Logging
     log_level: str = "INFO"
 
 
 settings = Settings()
+
+
+def build_llm(model_name: str, **kwargs: Any) -> LLM:
+    """Build an Ollama LLM with thinking mode disabled.
+
+    qwen3 models default to a <think> phase that can produce an empty final
+    response when the model exhausts its reasoning budget.  Passing
+    ``think=False`` via the Ollama options suppresses that phase.
+    """
+    return LLM(
+        model=model_name,
+        base_url=settings.ollama_base_url,
+        extra_body={"options": {"think": False}},
+        **kwargs,
+    )

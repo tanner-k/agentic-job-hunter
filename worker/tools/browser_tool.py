@@ -49,7 +49,7 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
-            headless=True,
+            headless=settings.headless,
             slow_mo=50,
             args=["--disable-blink-features=AutomationControlled"],
         )

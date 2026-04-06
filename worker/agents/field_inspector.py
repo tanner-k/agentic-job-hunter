@@ -1,6 +1,6 @@
-from crewai import LLM, Agent
+from crewai import Agent
 
-from worker.config import settings
+from worker.config import build_llm, settings
 from worker.tools.field_inspector_tool import field_inspector_tool
 
 
@@ -11,7 +11,7 @@ def build_field_inspector() -> Agent:
     rendered DOM. Uses the fast model since no reasoning is required —
     just sequential tool calls.
     """
-    llm = LLM(model=settings.fast_model, base_url=settings.ollama_base_url)
+    llm = build_llm(settings.fast_model)
     return Agent(
         role="Form Field Inspector",
         goal="Visit each job URL and return the exact form fields present on the page.",

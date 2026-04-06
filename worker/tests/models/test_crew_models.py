@@ -81,7 +81,7 @@ def test_application_packets_holds_list():
     from worker.models.application_packet import ApplicationPacket, ApplicationPackets
 
     packets = ApplicationPackets(
-        packets=[
+        job_applications=[
             ApplicationPacket(
                 url="https://a.com",
                 company="A",
@@ -91,15 +91,15 @@ def test_application_packets_holds_list():
             )
         ]
     )
-    assert len(packets.packets) == 1
+    assert len(packets.job_applications) == 1
 
 
 def test_build_field_inspector_returns_agent():
     from unittest.mock import MagicMock, patch
 
-    # Patch LLM, field_inspector_tool, and Agent to avoid needing Ollama running
+    # Patch build_llm, field_inspector_tool, and Agent to avoid needing Ollama running
     with (
-        patch("worker.agents.field_inspector.LLM") as mock_llm,
+        patch("worker.agents.field_inspector.build_llm") as mock_llm,
         patch("worker.agents.field_inspector.field_inspector_tool"),
         patch("worker.agents.field_inspector.Agent") as mock_agent,
     ):

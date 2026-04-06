@@ -1,6 +1,6 @@
 """Tests for the database repository layer using mocked Supabase client."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -35,8 +35,10 @@ class TestUpdateTaskStatus:
 
 
 class TestInsertApplication:
-    def test_calls_insert_with_all_required_fields(self, mock_client: MagicMock) -> None:
-        ts = datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+    def test_calls_insert_with_all_required_fields(
+        self, mock_client: MagicMock
+    ) -> None:
+        ts = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
         result = ApplicationResult(
             job_url="https://jobs.example.com/123",
             company="Acme Corp",
@@ -51,20 +53,22 @@ class TestInsertApplication:
         repository.insert_application(result)
 
         mock_client.table.assert_called_once_with("applications")
-        mock_client.table().insert.assert_called_once_with({
-            "search_task_id": "task-abc",
-            "company": "Acme Corp",
-            "job_title": "Software Engineer",
-            "job_url": "https://jobs.example.com/123",
-            "status": "applied",
-            "requires_resume": True,
-            "applied_at": ts.isoformat(),
-            "error_message": None,
-        })
+        mock_client.table().insert.assert_called_once_with(
+            {
+                "search_task_id": "task-abc",
+                "company": "Acme Corp",
+                "job_title": "Software Engineer",
+                "job_url": "https://jobs.example.com/123",
+                "status": "applied",
+                "requires_resume": True,
+                "applied_at": ts.isoformat(),
+                "error_message": None,
+            }
+        )
         mock_client.table().insert().execute.assert_called_once()
 
     def test_calls_insert_with_failed_status(self, mock_client: MagicMock) -> None:
-        ts = datetime(2025, 6, 15, 11, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 6, 15, 11, 0, 0, tzinfo=UTC)
         result = ApplicationResult(
             job_url="https://jobs.example.com/456",
             company="Globex",
@@ -84,15 +88,20 @@ class TestInsertApplication:
 
 class TestFetchPendingTasks:
     def test_returns_data_from_response(self, mock_client: MagicMock) -> None:
-        expected = [{"id": "task-1", "status": "pending"}, {"id": "task-2", "status": "pending"}]
-        mock_client.table().select().eq().execute.return_value = MagicMock(data=expected)
+        expected = [
+            {"id": "task-1", "status": "pending"},
+            {"id": "task-2", "status": "pending"},
+        ]
+        mock_client.table().select().eq().execute.return_value = MagicMock(
+            data=expected
+        )
 
         result = repository.fetch_pending_tasks()
 
         assert result == expected
-        mock_client.table.assert_called_once_with("search_tasks")
-        mock_client.table().select.assert_called_once_with("*")
-        mock_client.table().select().eq.assert_called_once_with("status", "pending")
+        mock_client.table.assert_called_with("search_tasks")
+        mock_client.table().select.assert_called_with("*")
+        mock_client.table().select().eq.assert_called_with("status", "pending")
 
     def test_returns_empty_list_when_data_is_none(self, mock_client: MagicMock) -> None:
         mock_client.table().select().eq().execute.return_value = MagicMock(data=None)

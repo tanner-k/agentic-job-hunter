@@ -1,12 +1,12 @@
-from crewai import Agent, LLM
+from crewai import Agent
 
-from worker.config import settings
+from worker.config import build_llm, settings
 from worker.tools.resume_loader import resume_loader_tool
 
 
 def build_evaluator() -> Agent:
     """Build the Senior Application Strategist agent."""
-    llm = LLM(model=settings.reasoning_model, base_url=settings.ollama_base_url)
+    llm = build_llm(settings.reasoning_model)
     return Agent(
         role="Senior Application Strategist",
         goal=(

@@ -14,4 +14,4 @@ class ApplicationPacket(BaseModel):
 class ApplicationPackets(BaseModel):
     """All application packets produced by the Evaluator agent."""
 
-    packets: list[ApplicationPacket]
+    job_applications: list[ApplicationPacket]

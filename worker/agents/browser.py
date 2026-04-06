@@ -1,12 +1,12 @@
-from crewai import Agent, LLM
+from crewai import Agent
 
-from worker.config import settings
+from worker.config import build_llm, settings
 from worker.tools.browser_tool import browser_tool
 
 
 def build_browser() -> Agent:
     """Build the Automated Browser Executor agent."""
-    llm = LLM(model=settings.fast_model, base_url=settings.ollama_base_url)
+    llm = build_llm(settings.fast_model)
     return Agent(
         role="Automated Browser Executor",
         goal="Execute form instructions and handle local file uploads.",

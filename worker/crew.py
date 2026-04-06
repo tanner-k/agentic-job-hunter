@@ -24,6 +24,7 @@ _TASK_SEARCH_DESCRIPTION = (
     "OPTIONAL CONSTRAINTS:\n"
     "- Target Company (if provided, only search this company): {company}\n"
     "- Target Website (if provided, use site: operator): {job_website}\n\n"
+    "EXCLUDED COMPANIES (do NOT return any job from these): {excluded_companies}\n\n"
     "You MUST search specifically on job boards. Run at least 3 of these queries:\n"
     '  "{job_title} {location} site:indeed.com"\n'
     '  "{job_title} {location} site:greenhouse.io"\n'
@@ -32,15 +33,15 @@ _TASK_SEARCH_DESCRIPTION = (
     "  indeed.com/viewjob, greenhouse.io/jobs/,\n"
     "  lever.co/jobs/, boards.greenhouse.io/, jobs.lever.co/, workday.com/jobs/\n\n"
     "DISCARD any result that looks like a social post, article, hashtag feed, or profile page.\n\n"
-    "Find up to 5 highly relevant job listings.\n\n"
-    "Output your findings in EXACTLY this format — one block per job, nothing else:\n\n"
+    "Find the single best matching job listing.\n\n"
+    "Output your finding in EXACTLY this format — one block only, nothing else:\n\n"
     "JOB:\n"
     "URL: <full https:// URL to the application page>\n"
     "Company: <company name>\n"
     "Title: <exact job title>\n"
     "---\n\n"
-    "Do NOT include any text outside of these blocks. "
-    "Every block MUST start with 'JOB:' on its own line and include a full URL."
+    "Output EXACTLY ONE job block. Do NOT include any text outside of this block. "
+    "The block MUST start with 'JOB:' on its own line and include a full URL."
 )
 
 _TASK_INSPECT_DESCRIPTION = (
@@ -84,12 +85,21 @@ _TASK_APPLY_DESCRIPTION = (
 )
 
 
-def run_crew(criteria: SearchCriteria, task_id: str | None = None) -> str:
-    """Build a fresh 4-stage crew and run it for the given search criteria.
+def run_crew(
+    criteria: SearchCriteria,
+    task_id: str | None = None,
+    excluded_companies: list[str] | None = None,
+) -> str | None:
+    """Run one search→inspect→evaluate→apply cycle for a single job.
 
-    A new crew is built per run to prevent context bleed between tasks.
+    A fresh crew is built each call to prevent context bleed.
     Stages: Searcher -> Field Inspector -> Evaluator -> Browser.
+
+    Returns:
+        The company name that was applied to, or None if no application was made.
     """
+    excluded = excluded_companies or []
+
     searcher = build_searcher()
     field_inspector = build_field_inspector()
     evaluator = build_evaluator()
@@ -98,26 +108,26 @@ def run_crew(criteria: SearchCriteria, task_id: str | None = None) -> str:
     task_search = Task(
         description=_TASK_SEARCH_DESCRIPTION,
         expected_output=(
-            "A plain-text list of up to 5 job listings found. "
-            "For each listing: URL, company name, and job title on separate lines."
+            "Exactly one job listing. "
+            "Format: JOB: / URL: / Company: / Title: / ---"
         ),
         agent=searcher,
     )
     task_inspect = Task(
         description=_TASK_INSPECT_DESCRIPTION,
-        expected_output="InspectedJobs JSON with form_fields and requires_resume per job.",
+        expected_output="InspectedJobs JSON with form_fields and requires_resume for the job.",
         agent=field_inspector,
         output_pydantic=InspectedJobs,
     )
     task_evaluate = Task(
         description=_TASK_EVALUATE_DESCRIPTION,
-        expected_output="ApplicationPackets JSON with json_instructions and requires_resume per approved job.",
+        expected_output="ApplicationPackets JSON with json_instructions and requires_resume for the approved job.",
         agent=evaluator,
         output_pydantic=ApplicationPackets,
     )
     task_apply = Task(
         description=_TASK_APPLY_DESCRIPTION,
-        expected_output="Final report of all submitted applications.",
+        expected_output="Final report confirming the application was submitted.",
         agent=browser_agent,
     )
 
@@ -129,6 +139,7 @@ def run_crew(criteria: SearchCriteria, task_id: str | None = None) -> str:
     )
 
     personal_data = json.loads(settings.personal_data_path.read_text())
+    excluded_str = ", ".join(excluded) if excluded else "none"
 
     inputs = {
         "job_title": criteria.job_title,
@@ -138,13 +149,29 @@ def run_crew(criteria: SearchCriteria, task_id: str | None = None) -> str:
         "company": criteria.company or "",
         "job_website": criteria.job_website or "",
         "personal_data": json.dumps(personal_data),
+        "excluded_companies": excluded_str,
     }
 
     set_current_task_id(task_id)
-    logger.info("crew_kickoff", task_id=task_id, job_title=criteria.job_title)
+    logger.info(
+        "crew_kickoff",
+        task_id=task_id,
+        job_title=criteria.job_title,
+        excluded=excluded,
+    )
     try:
-        result = crew.kickoff(inputs=inputs)
+        crew.kickoff(inputs=inputs)
     finally:
         set_current_task_id(None)
-    logger.info("crew_complete", task_id=task_id)
-    return str(result)
+
+    # Extract the company that was evaluated so the caller can exclude it next round.
+    company: str | None = None
+    try:
+        packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment]
+        if packets and packets.job_applications:
+            company = packets.job_applications[0].company
+    except Exception:
+        pass
+
+    logger.info("crew_complete", task_id=task_id, company_applied=company)
+    return company
