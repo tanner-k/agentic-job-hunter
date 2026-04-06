@@ -33,6 +33,9 @@ export default async function AdminLayout({
               <Link href="/admin/search" className="text-muted-foreground hover:text-foreground">
                 New Search
               </Link>
+              <Link href="/admin/emails" className="text-muted-foreground hover:text-foreground">
+                Emails
+              </Link>
               <Link href="/" className="text-muted-foreground hover:text-foreground">
                 Public View
               </Link>
