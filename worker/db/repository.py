@@ -34,8 +34,43 @@ def insert_application(result: ApplicationResult) -> None:
 def fetch_pending_tasks() -> list[dict]:
     """Fetch any tasks that are still pending (fallback on startup)."""
     client = get_client()
-    response = client.table("search_tasks").select("*").eq("status", "pending").execute()
+    response = (
+        client.table("search_tasks").select("*").eq("status", "pending").execute()
+    )
     return response.data or []
+
+
+def fetch_failed_applications(max_retries: int = 3) -> list[dict]:
+    """Fetch failed applications that are still under the retry limit."""
+    client = get_client()
+    response = (
+        client.table("applications")
+        .select("*")
+        .eq("status", "failed")
+        .lt("retry_count", max_retries)
+        .order("applied_at")
+        .execute()
+    )
+    return response.data or []
+
+
+def increment_retry_count(application_id: str) -> None:
+    """Increment the retry_count of an application row by 1."""
+    client = get_client()
+    response = (
+        client.table("applications")
+        .select("retry_count")
+        .eq("id", application_id)
+        .execute()
+    )
+    rows = response.data or []
+    current = rows[0]["retry_count"] if rows else 0
+    client.table("applications").update({"retry_count": current + 1}).eq(
+        "id", application_id
+    ).execute()
+    logger.info(
+        "retry_count_incremented", application_id=application_id, new_count=current + 1
+    )
 
 
 def insert_email_log(log: EmailLog) -> None:

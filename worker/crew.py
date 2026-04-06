@@ -85,31 +85,55 @@ _TASK_APPLY_DESCRIPTION = (
 )
 
 
+def _build_crew_inputs(
+    criteria: SearchCriteria,
+    excluded: list[str],
+) -> dict:
+    """Build the template variable dict passed to Crew.kickoff()."""
+    personal_data = json.loads(settings.personal_data_path.read_text())
+    excluded_str = ", ".join(excluded) if excluded else "none"
+    return {
+        "job_title": criteria.job_title,
+        "location": criteria.location,
+        "min_salary": criteria.min_salary,
+        "job_keywords": ", ".join(criteria.job_keywords),
+        "company": criteria.company or "",
+        "job_website": criteria.job_website or "",
+        "personal_data": json.dumps(personal_data),
+        "excluded_companies": excluded_str,
+    }
+
+
 def run_crew(
     criteria: SearchCriteria,
     task_id: str | None = None,
     excluded_companies: list[str] | None = None,
-) -> str | None:
-    """Run one search→inspect→evaluate→apply cycle for a single job.
+    dry_run: bool = False,
+) -> "str | ApplicationPackets | None":
+    """Run one search→inspect→evaluate→(apply) cycle for a single job.
 
     A fresh crew is built each call to prevent context bleed.
-    Stages: Searcher -> Field Inspector -> Evaluator -> Browser.
+    Stages: Searcher -> Field Inspector -> Evaluator -> [Browser if not dry_run].
+
+    Args:
+        dry_run: When True, skip the Browser task and return the ApplicationPackets
+                 produced by the Evaluator so the caller can preview what would be
+                 submitted before any real application is made.
 
     Returns:
-        The company name that was applied to, or None if no application was made.
+        dry_run=False: company name applied to, or None if no application was made.
+        dry_run=True:  ApplicationPackets from the Evaluator, or None on failure.
     """
     excluded = excluded_companies or []
 
     searcher = build_searcher()
     field_inspector = build_field_inspector()
     evaluator = build_evaluator()
-    browser_agent = build_browser()
 
     task_search = Task(
         description=_TASK_SEARCH_DESCRIPTION,
         expected_output=(
-            "Exactly one job listing. "
-            "Format: JOB: / URL: / Company: / Title: / ---"
+            "Exactly one job listing. Format: JOB: / URL: / Company: / Title: / ---"
         ),
         agent=searcher,
     )
@@ -125,32 +149,28 @@ def run_crew(
         agent=evaluator,
         output_pydantic=ApplicationPackets,
     )
-    task_apply = Task(
-        description=_TASK_APPLY_DESCRIPTION,
-        expected_output="Final report confirming the application was submitted.",
-        agent=browser_agent,
-    )
+
+    if dry_run:
+        agents = [searcher, field_inspector, evaluator]
+        tasks = [task_search, task_inspect, task_evaluate]
+    else:
+        browser_agent = build_browser()
+        task_apply = Task(
+            description=_TASK_APPLY_DESCRIPTION,
+            expected_output="Final report confirming the application was submitted.",
+            agent=browser_agent,
+        )
+        agents = [searcher, field_inspector, evaluator, browser_agent]
+        tasks = [task_search, task_inspect, task_evaluate, task_apply]
 
     crew = Crew(
-        agents=[searcher, field_inspector, evaluator, browser_agent],
-        tasks=[task_search, task_inspect, task_evaluate, task_apply],
+        agents=agents,
+        tasks=tasks,
         process=Process.sequential,
         verbose=True,
     )
 
-    personal_data = json.loads(settings.personal_data_path.read_text())
-    excluded_str = ", ".join(excluded) if excluded else "none"
-
-    inputs = {
-        "job_title": criteria.job_title,
-        "location": criteria.location,
-        "min_salary": criteria.min_salary,
-        "job_keywords": ", ".join(criteria.job_keywords),
-        "company": criteria.company or "",
-        "job_website": criteria.job_website or "",
-        "personal_data": json.dumps(personal_data),
-        "excluded_companies": excluded_str,
-    }
+    inputs = _build_crew_inputs(criteria, excluded)
 
     set_current_task_id(task_id)
     logger.info(
@@ -158,16 +178,25 @@ def run_crew(
         task_id=task_id,
         job_title=criteria.job_title,
         excluded=excluded,
+        dry_run=dry_run,
     )
     try:
         crew.kickoff(inputs=inputs)
     finally:
         set_current_task_id(None)
 
+    if dry_run:
+        try:
+            packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment]
+            logger.info("crew_dry_run_complete", task_id=task_id)
+            return packets
+        except Exception:
+            return None
+
     # Extract the company that was evaluated so the caller can exclude it next round.
     company: str | None = None
     try:
-        packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment]
+        packets = task_evaluate.output.pydantic  # type: ignore[assignment]
         if packets and packets.job_applications:
             company = packets.job_applications[0].company
     except Exception:

@@ -47,20 +47,14 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
     resume_path = settings.resume_path
     _SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    from worker.tools.stealth import get_context_options, get_launch_args, random_delay
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=settings.headless,
-            slow_mo=50,
-            args=["--disable-blink-features=AutomationControlled"],
+            args=get_launch_args(),
         )
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent=(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-        )
+        context = browser.new_context(**get_context_options())
         page = context.new_page()
         try:
             logger.info("browser_navigating", url=url)
@@ -71,10 +65,13 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
             except Exception:
                 page.goto(url, wait_until="domcontentloaded", timeout=20_000)
 
+            # Pause briefly to mimic human reading time before filling.
+            random_delay(page)
+
             # If this is a listing page, click through to the actual application form.
             click_through_to_form(page)
 
-            # Fill form fields
+            # Fill form fields with per-keystroke delays to simulate human typing.
             for field_name, value in form_data.items():
                 logger.debug("filling_field", field=field_name)
                 try:
@@ -82,6 +79,7 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
                         "xpath=following::input[1]"
                     )
                     locator.fill(str(value))
+                    random_delay(page, min_ms=200, max_ms=600)
                 except Exception:
                     logger.debug("field_not_found", field=field_name)
 

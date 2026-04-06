@@ -2,6 +2,8 @@
 
 Run with: uv run python -m worker.main
          uv run python -m worker.main --headless-false
+         uv run python -m worker.main --dry-run
+         uv run python -m worker.main --retry-failed
 """
 
 import argparse
@@ -16,11 +18,27 @@ _parser.add_argument(
     dest="headless_false",
     help="Run Playwright browser in non-headless (visible) mode",
 )
+_parser.add_argument(
+    "--dry-run",
+    action="store_true",
+    dest="dry_run",
+    help="Preview ApplicationPackets for the first pending task without submitting",
+)
+_parser.add_argument(
+    "--retry-failed",
+    action="store_true",
+    dest="retry_failed",
+    help="Re-attempt failed application rows that are under the retry limit",
+)
 _args, _ = _parser.parse_known_args()
+
 
 from worker.config import settings  # noqa: E402
 from worker.crew import run_crew  # noqa: E402
-from worker.db.repository import fetch_pending_tasks, update_task_status  # noqa: E402
+from worker.db.repository import (  # noqa: E402
+    fetch_pending_tasks,
+    update_task_status,
+)
 from worker.logging_config import configure_logging, get_logger  # noqa: E402
 from worker.models.search_criteria import SearchCriteria  # noqa: E402
 
@@ -94,6 +112,69 @@ def _drain_pending_tasks() -> None:
         _handle_task(task)
 
 
+def _handle_dry_run() -> None:
+    """Preview ApplicationPackets for the first pending task without submitting.
+
+    Runs Searcher → Field Inspector → Evaluator but skips the Browser agent.
+    Prints the resulting ApplicationPackets as formatted JSON and exits.
+    """
+    pending = fetch_pending_tasks()
+    if not pending:
+        logger.info("no_pending_tasks_for_dry_run")
+        print("No pending tasks found.")
+        return
+
+    task = pending[0]
+    criteria = SearchCriteria.from_dict(task)
+    logger.info("dry_run_starting", task_id=task["id"], job_title=criteria.job_title)
+
+    packets = run_crew(criteria, task_id=task["id"], dry_run=True)
+    if packets is None:
+        print("Dry run produced no packets (no matching jobs found).")
+        return
+
+    import json  # already imported at module level; local import keeps this self-contained
+
+    print(json.dumps(packets.model_dump(), indent=2))
+    logger.info("dry_run_complete", job_count=len(packets.job_applications))
+
+
+def _handle_retry_failed() -> None:
+    """Re-attempt failed application rows that are still under the retry limit.
+
+    Calls browser_tool directly for each row — skips the full LLM crew.
+    Increments retry_count on each attempt regardless of outcome.
+    """
+    from worker.db.repository import fetch_failed_applications, increment_retry_count
+    from worker.tools.browser_tool import browser_tool
+
+    rows = fetch_failed_applications()
+    if not rows:
+        logger.info("no_failed_applications_to_retry")
+        print("No failed applications eligible for retry.")
+        return
+
+    logger.info("retrying_failed_applications", count=len(rows))
+    for row in rows:
+        app_id: str = row["id"]
+        url: str = row.get("job_url", "")
+        requires_resume: bool = row.get("requires_resume", False)
+        logger.info("retrying_application", application_id=app_id, url=url)
+        try:
+            result = browser_tool(
+                url=url,
+                json_instructions="{}",
+                requires_resume=requires_resume,
+            )
+            logger.info("retry_result", application_id=app_id, result=result[:100])
+        except Exception as exc:
+            logger.error("retry_error", application_id=app_id, error=str(exc))
+        finally:
+            increment_retry_count(app_id)
+
+    print(f"Retry complete. Attempted {len(rows)} application(s).")
+
+
 async def _poll_loop() -> None:
     """Check for pending tasks on startup, then every 30 minutes."""
     while True:
@@ -116,6 +197,14 @@ async def _email_loop() -> None:
 
 
 async def main() -> None:
+    if _args.dry_run:
+        _handle_dry_run()
+        return
+
+    if _args.retry_failed:
+        _handle_retry_failed()
+        return
+
     logger.info(
         "worker_starting",
         fast_model=settings.fast_model,

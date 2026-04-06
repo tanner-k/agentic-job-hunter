@@ -9,12 +9,6 @@ from worker.tools.browser_utils import click_through_to_form
 
 logger = get_logger(__name__)
 
-_USER_AGENT = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
-)
-
 
 def _extract_fields(page: Page) -> list[str]:
     """Extract visible form field labels from a rendered page.
@@ -86,21 +80,23 @@ def _inspector_work(url: str) -> str:
     which avoids the "Playwright Sync API inside asyncio loop" error raised when
     CrewAI invokes tools from within its asyncio event loop.
     """
+    from worker.tools.stealth import get_context_options, get_launch_args, random_delay
+
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=True,
-                args=["--disable-blink-features=AutomationControlled"],
+                args=get_launch_args(),
             )
-            context = browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                user_agent=_USER_AGENT,
-            )
+            context = browser.new_context(**get_context_options())
             page = context.new_page()
             try:
                 page.goto(url, wait_until="networkidle", timeout=30_000)
             except Exception:
                 page.goto(url, wait_until="domcontentloaded", timeout=20_000)
+
+            # Pause briefly before extracting fields to let JS-rendered forms settle.
+            random_delay(page)
 
             # If this is a listing page, click through to the actual application form.
             click_through_to_form(page)
