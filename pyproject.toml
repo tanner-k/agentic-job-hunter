@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "agent-job-finder"
 version = "0.1.0"
@@ -7,7 +14,7 @@ requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "crewai>=1.12.2",
-    "duckduckgo-search>=8.1.1",
+    "ddgs>=9.0.0",
     "google-api-python-client>=2.0.0",
     "google-auth-httplib2>=0.2.0",
     "google-auth-oauthlib>=1.0.0",
@@ -48,5 +55,9 @@ ignore_missing_imports = true
 # not strict — some 3rd-party libs lack stubs
 
 [tool.pytest.ini_options]
-testpaths = ["worker/tests"]
+testpaths = ["src/worker/tests"]
+pythonpath = ["src"]
 addopts = "-x -q"
+markers = [
+    "integration: full pipeline tests with mocked external I/O",
+]

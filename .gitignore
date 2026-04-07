@@ -11,6 +11,8 @@ wheels/
 
 # Personal data (never commit)
 worker/personal/
+src/worker/personal/
+src/components/backend/worker/personal/
 credentials.json
 token.json
 .env
@@ -20,7 +22,11 @@ token.json
 
 # Screenshots (captured by browser_tool on failure)
 worker/screenshots/
+src/worker/screenshots/
+src/components/backend/worker/screenshots/
 !worker/screenshots/.gitkeep
+!src/worker/screenshots/.gitkeep
+!src/components/backend/worker/screenshots/.gitkeep
 
 # Session / handoff notes (private)
 HANDOFF.md

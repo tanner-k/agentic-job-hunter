@@ -43,7 +43,7 @@ graph TD
 
 The worker polls Supabase for tasks with `status = "pending"`. For each task it spins up a CrewAI crew with four sequential agents:
 
-1. **Searcher** — queries DuckDuckGo for job listings via `ddgs.DDGS` running in an isolated child process. Each query has a 15-second hard timeout (the subprocess is killed if it hangs) and calls are serialized through a threading lock with a 3-second rate-limit delay. Returns up to 5 candidate job URLs.
+1. **Searcher** — queries DuckDuckGo for job listings via `ddgs.DDGS` running in an isolated child process. Each query has a 15-second hard timeout (the subprocess is killed if it hangs) and calls are serialized through a threading lock with a 3-second rate-limit delay. Finds the single best matching job per cycle; the worker runs up to 10 cycles per task, building an exclusion list so the same company is never targeted twice.
 2. **Field Inspector** — visits each job URL with a headless Chromium browser, clicks through listing pages to the actual application form, and extracts the exact form field labels from the rendered DOM (`<label>` text, `placeholder`, `aria-label`, `name` attributes). Also detects whether a resume upload field is present. Runs Playwright inside a `ThreadPoolExecutor` to avoid conflicts with CrewAI's asyncio event loop. Results are returned as a structured `InspectedJobs` Pydantic model.
 3. **Evaluator** — receives the inspected field lists, filters out listings that don't meet your salary/keyword criteria, and maps your personal data to the exact field names found on each form. Produces an `ApplicationPackets` Pydantic model with per-field fill instructions.
 4. **Browser** — drives a headless Chromium browser via Playwright, navigates to each job URL, fills in form fields using the evaluator's instructions, and submits the application.
@@ -59,7 +59,7 @@ Results are written back to Supabase and surface immediately in the dashboard.
 - **Headless browser automation** — Playwright fills and submits real web forms, not just job board APIs
 - **Structured application tracking** — every attempt (applied, failed, skipped) is persisted to Supabase with timestamps and error context
 - **Email agent** — Gmail integration classifies recruiter messages and drafts replies on a configurable poll interval
-- **Real-time dashboard** — Next.js frontend shows live application status, task queue, and email logs
+- **Admin dashboard** — Next.js frontend shows application status, task queue, and email logs
 - **Immutable data models** — frozen dataclasses throughout the worker prevent accidental state mutation
 - **Structured logging** — `structlog` JSON output makes log aggregation and debugging straightforward
 - **Pre-commit hooks and CI** — ruff, mypy, and pytest run automatically on every commit and pull request
@@ -243,34 +243,51 @@ agent-job-finder/
 ├── dashboard/                  # Next.js frontend
 │   ├── app/
 │   ├── components/
+│   ├── lib/
 │   └── package.json
+├── docs/                       # Screenshots and assets
 ├── supabase/
 │   └── migrations/
 │       └── 0001_initial.sql
 ├── worker/
 │   ├── agents/                 # CrewAI agent definitions
 │   │   ├── browser.py
-│   │   ├── email_agent.py
+│   │   ├── email_agent.py      # Gmail classifier + draft reply (optional)
 │   │   ├── evaluator.py
-│   │   ├── field_inspector.py  # DOM field extraction agent
+│   │   ├── field_inspector.py
 │   │   └── searcher.py
 │   ├── db/
 │   │   ├── client.py           # Supabase client singleton
 │   │   └── repository.py       # Data access layer
-│   ├── models/                 # Frozen dataclasses
+│   ├── models/                 # Frozen Pydantic / dataclass models
+│   │   ├── application_packet.py   # ApplicationPacket + ApplicationPackets
 │   │   ├── application_result.py
-│   │   ├── job.py
+│   │   ├── email_log.py
+│   │   ├── inspected_job.py        # InspectedJob + InspectedJobs
+│   │   ├── job_listing.py
 │   │   └── search_criteria.py
 │   ├── personal/               # Gitignored — resume, credentials, personal data
 │   ├── tests/
+│   │   ├── models/
+│   │   ├── tools/
 │   │   ├── test_config.py
-│   │   ├── test_models.py
+│   │   ├── test_crew.py
 │   │   └── test_repository.py
+│   ├── tools/                  # CrewAI tool implementations
+│   │   ├── browser_tool.py     # Playwright form filler
+│   │   ├── browser_utils.py    # Click-through-to-form helpers
+│   │   ├── field_inspector_tool.py
+│   │   ├── resume_loader.py
+│   │   └── search_tool.py      # DuckDuckGo subprocess search
 │   ├── config.py               # pydantic-settings Settings class
+│   ├── crew.py                 # CrewAI crew factory + run_crew()
 │   ├── logging_config.py       # structlog setup
 │   └── main.py                 # Worker entry point
 ├── .env.example
 ├── .pre-commit-config.yaml
+├── CONTRIBUTING.md
+├── HANDOFF.md                  # Session notes and known issues
+├── LICENSE
 ├── pyproject.toml
 ├── search_criteria.csv         # Example criteria input
 └── uv.lock
@@ -307,13 +324,7 @@ uv run mypy worker/
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Write tests first, then implement
-4. Ensure `uv run pytest` passes and `uv run ruff check .` is clean
-5. Open a pull request against `main` with a clear description of the change
-
-Please follow conventional commit format (`feat:`, `fix:`, `docs:`, etc.) and keep PRs focused on a single concern.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contribution guide.
 
 ## License
 
