@@ -12,7 +12,7 @@ class EmailLog:
     summary: str
     received_at: datetime
     draft_link: str | None = None
-    synced_at: datetime = None
+    synced_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if self.synced_at is None:

@@ -13,7 +13,7 @@ class ApplicationResult:
     search_task_id: str | None = None
     requires_resume: bool = False
     error_message: str | None = None
-    applied_at: datetime = None
+    applied_at: datetime | None = None
 
     def __post_init__(self) -> None:
         # Use object.__setattr__ because dataclass is frozen

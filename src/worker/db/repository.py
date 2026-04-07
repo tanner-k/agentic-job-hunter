@@ -24,7 +24,7 @@ def insert_application(result: ApplicationResult) -> None:
             "job_url": result.job_url,
             "status": result.status,
             "requires_resume": result.requires_resume,
-            "applied_at": result.applied_at.isoformat(),
+            "applied_at": result.applied_at.isoformat(),  # type: ignore[union-attr]
             "error_message": result.error_message,
         }
     ).execute()
@@ -37,7 +37,7 @@ def fetch_pending_tasks() -> list[dict]:
     response = (
         client.table("search_tasks").select("*").eq("status", "pending").execute()
     )
-    return response.data or []
+    return response.data or []  # type: ignore[return-value]
 
 
 def fetch_failed_applications(max_retries: int = 3) -> list[dict]:
@@ -51,7 +51,7 @@ def fetch_failed_applications(max_retries: int = 3) -> list[dict]:
         .order("applied_at")
         .execute()
     )
-    return response.data or []
+    return response.data or []  # type: ignore[return-value]
 
 
 def increment_retry_count(application_id: str) -> None:
@@ -63,7 +63,7 @@ def increment_retry_count(application_id: str) -> None:
         .eq("id", application_id)
         .execute()
     )
-    rows = response.data or []
+    rows: list[dict] = response.data or []  # type: ignore[assignment]
     current = rows[0]["retry_count"] if rows else 0
     client.table("applications").update({"retry_count": current + 1}).eq(
         "id", application_id
@@ -84,7 +84,7 @@ def insert_email_log(log: EmailLog) -> None:
             "summary": log.summary,
             "draft_link": log.draft_link,
             "received_at": log.received_at.isoformat(),
-            "synced_at": log.synced_at.isoformat(),
+            "synced_at": log.synced_at.isoformat(),  # type: ignore[union-attr]
         }
     ).execute()
     logger.info("email_log_inserted", sender=log.sender, sentiment=log.sentiment)

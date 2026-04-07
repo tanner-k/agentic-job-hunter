@@ -40,6 +40,7 @@ from worker.db.repository import (  # noqa: E402
     update_task_status,
 )
 from worker.logging_config import configure_logging, get_logger  # noqa: E402
+from worker.models.application_packet import ApplicationPackets  # noqa: E402
 from worker.models.search_criteria import SearchCriteria  # noqa: E402
 
 # Suppress CrewAI's OpenAI key requirement
@@ -83,7 +84,7 @@ def _handle_task(task: dict) -> None:
                 excluded_companies=excluded_companies,
             )
             applications_attempted += 1
-            if company:
+            if isinstance(company, str):
                 excluded_companies.append(company)
         except Exception as exc:
             logger.error(
@@ -135,6 +136,7 @@ def _handle_dry_run() -> None:
 
     import json  # already imported at module level; local import keeps this self-contained
 
+    assert isinstance(packets, ApplicationPackets)
     print(json.dumps(packets.model_dump(), indent=2))
     logger.info("dry_run_complete", job_count=len(packets.job_applications))
 
@@ -161,7 +163,7 @@ def _handle_retry_failed() -> None:
         requires_resume: bool = row.get("requires_resume", False)
         logger.info("retrying_application", application_id=app_id, url=url)
         try:
-            result = browser_tool(
+            result = browser_tool(  # type: ignore[operator]
                 url=url,
                 json_instructions="{}",
                 requires_resume=requires_resume,

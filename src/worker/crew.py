@@ -164,7 +164,7 @@ def run_crew(
         tasks = [task_search, task_inspect, task_evaluate, task_apply]
 
     crew = Crew(
-        agents=agents,
+        agents=agents,  # type: ignore[arg-type]
         tasks=tasks,
         process=Process.sequential,
         verbose=True,
@@ -187,7 +187,7 @@ def run_crew(
 
     if dry_run:
         try:
-            packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment]
+            packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment, union-attr]
             logger.info("crew_dry_run_complete", task_id=task_id)
             return packets
         except Exception:
@@ -196,7 +196,7 @@ def run_crew(
     # Extract the company that was evaluated so the caller can exclude it next round.
     company: str | None = None
     try:
-        packets = task_evaluate.output.pydantic  # type: ignore[assignment]
+        packets = task_evaluate.output.pydantic  # type: ignore[assignment, union-attr]
         if packets and packets.job_applications:
             company = packets.job_applications[0].company
     except Exception:

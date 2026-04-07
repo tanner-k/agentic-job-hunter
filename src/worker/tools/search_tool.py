@@ -54,7 +54,7 @@ def search_tool(query: str) -> str:
             logger.warning("search_failed", query=query, error=raw["error"])
             return f"Search failed: {raw['error']}"
 
-        results: list[dict] = raw
+        results: list[dict] = raw  # type: ignore[assignment]
 
     if not results:
         return "No results found."

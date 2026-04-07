@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
 
 
 def build_llm(model_name: str, **kwargs: Any) -> LLM:
@@ -62,6 +62,6 @@ def build_llm(model_name: str, **kwargs: Any) -> LLM:
     return LLM(
         model=model_name,
         base_url=settings.ollama_base_url,
-        extra_body={"options": {"think": False}},
+        extra_body={"options": {"think": False}},  # type: ignore[call-arg]
         **kwargs,
     )
