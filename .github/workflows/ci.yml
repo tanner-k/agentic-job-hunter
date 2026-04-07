@@ -29,6 +29,10 @@ jobs:
         run: uv run mypy src/worker/
 
       - name: Run tests
+        env:
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_KEY: placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
         run: uv run pytest src/worker/tests/ -x -q
 
   dashboard-lint:

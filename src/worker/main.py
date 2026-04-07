@@ -40,7 +40,6 @@ from worker.db.repository import (  # noqa: E402
     update_task_status,
 )
 from worker.logging_config import configure_logging, get_logger  # noqa: E402
-from worker.models.application_packet import ApplicationPackets  # noqa: E402
 from worker.models.search_criteria import SearchCriteria  # noqa: E402
 
 # Suppress CrewAI's OpenAI key requirement
@@ -136,9 +135,8 @@ def _handle_dry_run() -> None:
 
     import json  # already imported at module level; local import keeps this self-contained
 
-    assert isinstance(packets, ApplicationPackets)
-    print(json.dumps(packets.model_dump(), indent=2))
-    logger.info("dry_run_complete", job_count=len(packets.job_applications))
+    print(json.dumps(packets.model_dump(), indent=2))  # type: ignore[union-attr]
+    logger.info("dry_run_complete", job_count=len(packets.job_applications))  # type: ignore[union-attr]
 
 
 def _handle_retry_failed() -> None:
