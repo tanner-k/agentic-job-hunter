@@ -26,10 +26,10 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Mypy type check
-        run: uv run mypy worker/
+        run: uv run mypy src/worker/
 
       - name: Run tests
-        run: uv run pytest worker/tests/ -x -q
+        run: uv run pytest src/worker/tests/ -x -q
 
   dashboard-lint:
     name: Lint and Build (Dashboard)
@@ -43,16 +43,16 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: dashboard/package-lock.json
+          cache-dependency-path: src/dashboard/package-lock.json
 
       - name: Install dependencies
-        working-directory: dashboard
+        working-directory: src/dashboard
         run: npm ci
 
       - name: Lint
-        working-directory: dashboard
+        working-directory: src/dashboard
         run: npm run lint
 
       - name: Build
-        working-directory: dashboard
+        working-directory: src/dashboard
         run: npm run build
