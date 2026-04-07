@@ -1,3 +1,10 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [project]
 name = "agent-job-finder"
 version = "0.1.0"
@@ -48,7 +55,8 @@ ignore_missing_imports = true
 # not strict — some 3rd-party libs lack stubs
 
 [tool.pytest.ini_options]
-testpaths = ["worker/tests"]
+testpaths = ["src/worker/tests"]
+pythonpath = ["src"]
 addopts = "-x -q"
 markers = [
     "integration: full pipeline tests with mocked external I/O",
