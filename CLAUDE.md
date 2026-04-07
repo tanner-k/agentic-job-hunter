@@ -23,7 +23,7 @@ Autonomous multi-agent system that takes job search criteria and applies to matc
 | Task | Go to | Read | Skills |
 |------|-------|------|--------|
 | Spec a feature | /planning | CONTEXT.md | brainstorming, superpowers:writing-plans |
-| Write code | /src | CONTEXT.md | superpowers:test-driven-development, superpowers:requesting-code-review, systematic-debugging, ui-ux-pro-max |
+| Write code | /src | CONTEXT.md | superpowers:test-driven-development, superpowers:requesting-code-review, systematic-debugging, ui-ux-pro-max, pre-push-checks |
 | Write docs | /docs | CONTEXT.md | superpowers:writing-plans |
 | Deploy or debug ops | /ops | CONTEXT.md | systematic-debugging |
 
