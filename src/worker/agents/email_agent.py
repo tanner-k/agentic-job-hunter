@@ -51,7 +51,9 @@ def _get_gmail_service():
                     f"Gmail credentials not found at {credentials_path}. "
                     "Download credentials.json from Google Cloud Console."
                 )
-            flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                str(credentials_path), SCOPES
+            )
             creds = flow.run_local_server(port=0)
 
         with token_path.open("wb") as f:
@@ -72,7 +74,9 @@ def _get_email_body(msg: dict) -> str:
     for part in parts:
         if part.get("mimeType") == "text/plain":
             data = part.get("body", {}).get("data", "")
-            return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+            return base64.urlsafe_b64decode(data + "==").decode(
+                "utf-8", errors="replace"
+            )
 
     return ""
 
@@ -128,10 +132,15 @@ def _create_draft_reply(service, thread_id: str, to: str, subject: str) -> str |
     encoded = base64.urlsafe_b64encode(message_text.encode("utf-8")).decode("utf-8")
 
     try:
-        draft = service.users().drafts().create(
-            userId="me",
-            body={"message": {"raw": encoded, "threadId": thread_id}},
-        ).execute()
+        draft = (
+            service.users()
+            .drafts()
+            .create(
+                userId="me",
+                body={"message": {"raw": encoded, "threadId": thread_id}},
+            )
+            .execute()
+        )
         draft_id = draft.get("id", "")
         logger.info("draft_created", draft_id=draft_id, to=to)
         # Return a usable link to the draft (opens Gmail web)
@@ -152,11 +161,16 @@ def run() -> None:
         return
 
     try:
-        results = service.users().messages().list(
-            userId="me",
-            q="is:unread",
-            maxResults=20,
-        ).execute()
+        results = (
+            service.users()
+            .messages()
+            .list(
+                userId="me",
+                q="is:unread",
+                maxResults=20,
+            )
+            .execute()
+        )
     except HttpError as exc:
         logger.error("gmail_fetch_failed", error=str(exc))
         return
@@ -167,14 +181,19 @@ def run() -> None:
     for msg_ref in messages:
         msg_id = msg_ref["id"]
         try:
-            msg = service.users().messages().get(
-                userId="me", id=msg_id, format="full"
-            ).execute()
+            msg = (
+                service.users()
+                .messages()
+                .get(userId="me", id=msg_id, format="full")
+                .execute()
+            )
         except HttpError as exc:
             logger.error("message_fetch_failed", msg_id=msg_id, error=str(exc))
             continue
 
-        headers = {h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])}
+        headers = {
+            h["name"]: h["value"] for h in msg.get("payload", {}).get("headers", [])
+        }
         subject = headers.get("Subject", "(no subject)")
         sender = headers.get("From", "unknown")
         thread_id = msg.get("threadId", "")

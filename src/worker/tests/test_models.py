@@ -40,7 +40,11 @@ class TestSearchCriteria:
         assert criteria.min_salary == 0
 
     def test_from_dict_defaults_min_salary_to_zero_when_empty_string(self) -> None:
-        data = {"job_title": "Backend Developer", "location": "Austin", "min_salary": ""}
+        data = {
+            "job_title": "Backend Developer",
+            "location": "Austin",
+            "min_salary": "",
+        }
         criteria = SearchCriteria.from_dict(data)
         assert criteria.min_salary == 0
 

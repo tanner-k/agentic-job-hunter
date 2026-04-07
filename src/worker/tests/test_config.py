@@ -16,7 +16,9 @@ def required_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestSettingsDefaults:
-    def test_default_fast_model(self, required_env: None, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_fast_model(
+        self, required_env: None, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         settings = Settings(
             supabase_url="https://test.supabase.co",
             supabase_key="key",
