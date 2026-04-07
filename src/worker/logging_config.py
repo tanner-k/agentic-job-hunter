@@ -1,6 +1,8 @@
 import logging
 import sys
+
 import structlog
+
 from worker.config import settings
 
 

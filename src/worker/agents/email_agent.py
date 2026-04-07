@@ -11,12 +11,10 @@ Gmail OAuth setup (one-time, run manually):
 import base64
 import json
 import pickle
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 from crewai import LLM
 from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -185,7 +183,7 @@ def run() -> None:
         try:
             received_at = datetime.fromisoformat(date_str)
         except (ValueError, TypeError):
-            received_at = datetime.now(tz=timezone.utc)
+            received_at = datetime.now(tz=UTC)
 
         body = _get_email_body(msg)
         sentiment, summary = _classify_email(subject, body)

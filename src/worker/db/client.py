@@ -1,7 +1,6 @@
 from functools import lru_cache
 
 from supabase import Client, create_client
-
 from worker.config import settings
 
 

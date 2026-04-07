@@ -1,3 +1,4 @@
+import contextlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 
@@ -28,10 +29,8 @@ def _extract_fields(page: Page) -> list[str]:
 
     # 1. Explicit <label> elements
     for label in page.locator("label").all():
-        try:
+        with contextlib.suppress(Exception):
             add(label.inner_text())
-        except Exception:
-            pass
 
     # 2. Inputs (not hidden/submit/button/file)
     input_selector = (

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -16,4 +16,4 @@ class EmailLog:
 
     def __post_init__(self) -> None:
         if self.synced_at is None:
-            object.__setattr__(self, "synced_at", datetime.now(tz=timezone.utc))
+            object.__setattr__(self, "synced_at", datetime.now(tz=UTC))

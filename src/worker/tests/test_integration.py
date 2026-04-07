@@ -61,7 +61,6 @@ class TestRunCrewPipeline:
 
             # task_evaluate.output.pydantic returns None (no packets produced)
             tasks = []
-            original_task = crew_module.Task
 
             def capture_task(**kwargs):
                 t = MagicMock()

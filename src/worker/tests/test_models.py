@@ -1,7 +1,7 @@
 """Tests for immutable dataclass models."""
 
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -87,19 +87,19 @@ class TestJob:
 
 class TestApplicationResult:
     def test_auto_sets_applied_at_when_none(self) -> None:
-        before = datetime.now(tz=timezone.utc)
+        before = datetime.now(tz=UTC)
         result = ApplicationResult(
             job_url="https://example.com/job/1",
             company="Acme",
             job_title="Engineer",
             status="applied",
         )
-        after = datetime.now(tz=timezone.utc)
+        after = datetime.now(tz=UTC)
         assert result.applied_at is not None
         assert before <= result.applied_at <= after
 
     def test_preserves_explicit_applied_at(self) -> None:
-        ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
         result = ApplicationResult(
             job_url="https://example.com/job/1",
             company="Acme",

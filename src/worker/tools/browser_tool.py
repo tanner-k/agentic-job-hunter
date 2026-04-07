@@ -1,3 +1,4 @@
+import contextlib
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -128,10 +129,8 @@ def _browser_work(url: str, json_instructions: str, requires_resume: bool) -> st
 
         except Exception as exc:
             screenshot_path = _SCREENSHOTS_DIR / f"error_{hash(url) & 0xFFFF}.png"
-            try:
+            with contextlib.suppress(Exception):
                 page.screenshot(path=str(screenshot_path))
-            except Exception:
-                pass
             logger.error("browser_error", url=url, error=str(exc))
             _record_application(url, requires_resume, status="failed", error=str(exc))
             return f"Browser error at {url}: {exc}"
