@@ -35,6 +35,8 @@ def test_inspected_job_fields_and_resume():
         job_title="Engineer",
         form_fields=["First Name", "Email"],
         requires_resume=True,
+        requires_cover_letter=False,
+        job_description="",
     )
     assert job.form_fields == ["First Name", "Email"]
     assert job.requires_resume is True
@@ -51,6 +53,8 @@ def test_inspected_jobs_holds_list():
                 job_title="D",
                 form_fields=["Email"],
                 requires_resume=False,
+                requires_cover_letter=False,
+                job_description="",
             ),
         ]
     )
@@ -92,6 +96,56 @@ def test_application_packets_holds_list():
         ]
     )
     assert len(packets.job_applications) == 1
+
+
+def test_inspected_job_has_cover_letter_fields():
+    from worker.models.inspected_job import InspectedJob
+
+    job = InspectedJob(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        form_fields=["First Name"],
+        requires_resume=False,
+        requires_cover_letter=True,
+        job_description="We are looking for a talented engineer.",
+    )
+    assert job.requires_cover_letter is True
+    assert job.job_description == "We are looking for a talented engineer."
+
+
+def test_application_packet_has_cover_letter_fields():
+    import json
+
+    from worker.models.application_packet import ApplicationPacket
+
+    packet = ApplicationPacket(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        json_instructions=json.dumps({"Email": "t@example.com"}),
+        requires_resume=False,
+    )
+    assert packet.cover_letter_text is None
+    assert packet.cover_letter_path is None
+
+
+def test_application_packet_cover_letter_fields_accept_values():
+    import json
+
+    from worker.models.application_packet import ApplicationPacket
+
+    packet = ApplicationPacket(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        json_instructions=json.dumps({"Email": "t@example.com"}),
+        requires_resume=False,
+        cover_letter_text="Dear Hiring Manager...",
+        cover_letter_path="/tmp/acme_engineer_20260409_120000.pdf",
+    )
+    assert packet.cover_letter_text == "Dear Hiring Manager..."
+    assert packet.cover_letter_path == "/tmp/acme_engineer_20260409_120000.pdf"
 
 
 def test_build_field_inspector_returns_agent():
