@@ -148,6 +148,30 @@ def test_application_packet_cover_letter_fields_accept_values():
     assert packet.cover_letter_path == "/tmp/acme_engineer_20260409_120000.pdf"
 
 
+def test_build_cover_letter_writer_returns_agent():
+    from unittest.mock import MagicMock, patch
+
+    with (
+        patch("worker.agents.cover_letter_writer.build_llm") as mock_llm,
+        patch("worker.agents.cover_letter_writer.resume_loader_tool"),
+        patch("worker.agents.cover_letter_writer.cover_letter_context_loader_tool"),
+        patch("worker.agents.cover_letter_writer.pdf_renderer_tool"),
+        patch("worker.agents.cover_letter_writer.Agent") as mock_agent,
+    ):
+        mock_llm.return_value = MagicMock()
+        agent_instance = MagicMock()
+        agent_instance.role = "Cover Letter Writer"
+        agent_instance.allow_delegation = False
+        mock_agent.return_value = agent_instance
+
+        from worker.agents.cover_letter_writer import build_cover_letter_writer
+
+        agent = build_cover_letter_writer()
+
+    assert agent.role == "Cover Letter Writer"
+    assert agent.allow_delegation is False
+
+
 def test_build_field_inspector_returns_agent():
     from unittest.mock import MagicMock, patch
 
