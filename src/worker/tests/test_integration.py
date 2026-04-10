@@ -53,6 +53,9 @@ class TestRunCrewPipeline:
                 crew_module, "build_field_inspector", return_value=MagicMock()
             ),
             patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+            patch.object(
+                crew_module, "build_cover_letter_writer", return_value=MagicMock()
+            ),
             patch.object(crew_module, "build_browser", return_value=MagicMock()),
             patch.object(crew_module, "Crew", return_value=mock_crew_instance),
             patch.object(crew_module, "set_current_task_id"),
@@ -75,8 +78,8 @@ class TestRunCrewPipeline:
 
         assert result is None
 
-    def test_run_crew_builds_four_tasks_in_correct_order(self, tmp_path):
-        """Crew must receive exactly 4 tasks in search → inspect → evaluate → apply order."""
+    def test_run_crew_builds_five_tasks_in_correct_order(self, tmp_path):
+        """Crew must receive exactly 5 tasks in search → inspect → evaluate → cover_letter → apply order."""
         import worker.crew as crew_module
 
         personal_file = self._setup_crew_mock(tmp_path)
@@ -95,6 +98,9 @@ class TestRunCrewPipeline:
                 crew_module, "build_field_inspector", return_value=MagicMock()
             ),
             patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+            patch.object(
+                crew_module, "build_cover_letter_writer", return_value=MagicMock()
+            ),
             patch.object(crew_module, "build_browser", return_value=MagicMock()),
             patch.object(crew_module, "Task", return_value=MagicMock()),
             patch.object(crew_module, "Crew", side_effect=capture_crew),
@@ -103,7 +109,7 @@ class TestRunCrewPipeline:
             mock_settings.personal_data_path = personal_file
             crew_module.run_crew(self._criteria())
 
-        assert len(tasks_received) == 4
+        assert len(tasks_received) == 5
 
     def test_task_apply_description_contains_do_not_search_guard(self, tmp_path):
         """Browser task description must contain the tool-guard instruction."""
@@ -127,6 +133,9 @@ class TestRunCrewPipeline:
                 crew_module, "build_field_inspector", return_value=MagicMock()
             ),
             patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+            patch.object(
+                crew_module, "build_cover_letter_writer", return_value=MagicMock()
+            ),
             patch.object(crew_module, "build_browser", return_value=MagicMock()),
             patch.object(crew_module, "Task", side_effect=capture_task),
             patch.object(
@@ -161,6 +170,9 @@ class TestRunCrewPipeline:
                 crew_module, "build_field_inspector", return_value=MagicMock()
             ),
             patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+            patch.object(
+                crew_module, "build_cover_letter_writer", return_value=MagicMock()
+            ),
             patch.object(crew_module, "build_browser", return_value=MagicMock()),
             patch.object(crew_module, "Task", return_value=MagicMock()),
             patch.object(crew_module, "Crew", return_value=mock_crew),
@@ -188,6 +200,9 @@ class TestRunCrewPipeline:
                 crew_module, "build_field_inspector", return_value=MagicMock()
             ),
             patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+            patch.object(
+                crew_module, "build_cover_letter_writer", return_value=MagicMock()
+            ),
             patch.object(crew_module, "build_browser", return_value=MagicMock()),
             patch.object(crew_module, "Task", return_value=MagicMock()),
             patch.object(

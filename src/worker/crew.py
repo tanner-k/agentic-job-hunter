@@ -3,6 +3,7 @@ import json
 from crewai import Crew, Process, Task
 
 from worker.agents.browser import build_browser
+from worker.agents.cover_letter_writer import build_cover_letter_writer
 from worker.agents.evaluator import build_evaluator
 from worker.agents.field_inspector import build_field_inspector
 from worker.agents.searcher import build_searcher
@@ -76,12 +77,35 @@ _TASK_EVALUATE_DESCRIPTION = (
     "3. Output one ApplicationPacket per approved job. Do not skip any approved job."
 )
 
+_TASK_COVER_LETTER_DESCRIPTION = (
+    "You will receive two sources of data:\n"
+    "- Your sequential task input contains the ApplicationPackets produced by the Evaluator.\n"
+    "- Your context contains the InspectedJobs produced by the Field Inspector "
+    "(which includes job_description for each URL).\n\n"
+    "STEP 1: Call resume_loader_tool and cover_letter_context_loader_tool ONCE at the start. "
+    "Reuse the results for all packets.\n\n"
+    "STEP 2: For each packet where requires_cover_letter=True:\n"
+    "  a. Find the InspectedJob where InspectedJob.url == ApplicationPacket.url. "
+    "If no match is found, use an empty job_description and continue — do not halt.\n"
+    "  b. Draft a compelling, tailored cover letter using: job_title, company, "
+    "job_description, resume text, and personal context.\n"
+    "  c. Set cover_letter_text to the drafted letter text BEFORE calling pdf_renderer_tool.\n"
+    "  d. Call pdf_renderer_tool with company, job_title, and cover_letter_text.\n"
+    "  e. If the returned string starts with 'Error:', set cover_letter_path=null and continue.\n"
+    "     Otherwise, set cover_letter_path to the returned absolute path.\n\n"
+    "STEP 3: For packets where requires_cover_letter=False: "
+    "set cover_letter_text=null and cover_letter_path=null.\n\n"
+    "Output the complete ApplicationPackets JSON including ALL packets."
+)
+
 _TASK_APPLY_DESCRIPTION = (
-    "You have a list of ApplicationPackets from the Evaluator. "
+    "You have a list of ApplicationPackets from the Cover Letter Writer. "
     "For EACH packet, immediately call the Browser Form Fitter tool with:\n"
     "- url: the exact URL from the packet\n"
     "- json_instructions: the exact json_instructions string from the packet\n"
     "- requires_resume: the boolean value from the packet\n"
+    "- cover_letter_text: the cover_letter_text value from the packet (may be null)\n"
+    "- cover_letter_path: the cover_letter_path value from the packet (may be null)\n"
     "Do NOT search the web. Do NOT skip any packets. Call Browser Form Fitter once per job."
 )
 
@@ -111,15 +135,15 @@ def run_crew(
     excluded_companies: list[str] | None = None,
     dry_run: bool = False,
 ) -> "str | ApplicationPackets | None":
-    """Run one search→inspect→evaluate→(apply) cycle for a single job.
+    """Run one search→inspect→evaluate→(cover letter)→(apply) cycle for a single job.
 
     A fresh crew is built each call to prevent context bleed.
-    Stages: Searcher -> Field Inspector -> Evaluator -> [Browser if not dry_run].
+    Stages: Searcher -> Field Inspector -> Evaluator -> [Cover Letter Writer -> Browser if not dry_run].
 
     Args:
-        dry_run: When True, skip the Browser task and return the ApplicationPackets
-                 produced by the Evaluator so the caller can preview what would be
-                 submitted before any real application is made.
+        dry_run: When True, skip the Cover Letter Writer and Browser tasks and return
+                 the ApplicationPackets produced by the Evaluator so the caller can
+                 preview what would be submitted before any real application is made.
 
     Returns:
         dry_run=False: company name applied to, or None if no application was made.
@@ -158,14 +182,41 @@ def run_crew(
         agents = [searcher, field_inspector, evaluator]
         tasks = [task_search, task_inspect, task_evaluate]
     else:
+        cover_letter_writer_agent = build_cover_letter_writer()
         browser_agent = build_browser()
+
+        task_cover_letter = Task(
+            description=_TASK_COVER_LETTER_DESCRIPTION,
+            expected_output=(
+                "ApplicationPackets JSON identical to the input, with cover_letter_text and "
+                "cover_letter_path populated for each packet that had requires_cover_letter=True. "
+                "If PDF rendering failed, cover_letter_path must be null but cover_letter_text "
+                "must still be set. Packets with requires_cover_letter=False are passed through "
+                "with cover_letter_text=null and cover_letter_path=null."
+            ),
+            agent=cover_letter_writer_agent,
+            output_pydantic=ApplicationPackets,
+            context=[task_inspect],
+        )
         task_apply = Task(
             description=_TASK_APPLY_DESCRIPTION,
             expected_output="Final report confirming the application was submitted.",
             agent=browser_agent,
         )
-        agents = [searcher, field_inspector, evaluator, browser_agent]
-        tasks = [task_search, task_inspect, task_evaluate, task_apply]
+        agents = [
+            searcher,
+            field_inspector,
+            evaluator,
+            cover_letter_writer_agent,
+            browser_agent,
+        ]
+        tasks = [
+            task_search,
+            task_inspect,
+            task_evaluate,
+            task_cover_letter,
+            task_apply,
+        ]
 
     crew = Crew(
         agents=agents,  # type: ignore[arg-type]
@@ -197,10 +248,10 @@ def run_crew(
         except Exception:
             return None
 
-    # Extract the company that was evaluated so the caller can exclude it next round.
+    # Extract the company that was applied to so the caller can exclude it next round.
     company: str | None = None
     try:
-        packets = task_evaluate.output.pydantic  # type: ignore[assignment, union-attr]
+        packets = task_cover_letter.output.pydantic  # type: ignore[assignment, union-attr]
         if packets and packets.job_applications:
             company = packets.job_applications[0].company
     except Exception:
