@@ -124,6 +124,101 @@ def test_tool_returns_empty_on_playwright_error():
     assert "error" in data
 
 
+def test_get_input_label_via_label_for():
+    """Returns label text when <label for="id"> matches the element's id."""
+    from unittest.mock import MagicMock
+
+    from worker.tools.field_inspector_tool import _get_input_label
+
+    page = MagicMock()
+    element = MagicMock()
+    element.get_attribute.side_effect = lambda attr: (
+        "email-field" if attr == "id" else None
+    )
+    label_loc = MagicMock()
+    label_loc.inner_text.return_value = "Email Address"
+    page.locator.return_value = label_loc
+
+    result = _get_input_label(page, element)
+    assert result == "Email Address"
+    page.locator.assert_called_with('label[for="email-field"]')
+
+
+def test_get_input_label_via_wrapping_label():
+    """Falls back to wrapping ancestor label when label-for lookup fails."""
+    from unittest.mock import MagicMock
+
+    from worker.tools.field_inspector_tool import _get_input_label
+
+    page = MagicMock()
+    element = MagicMock()
+    element.get_attribute.return_value = None
+    page.locator.side_effect = Exception("no label[for]")
+    ancestor = MagicMock()
+    ancestor.inner_text.return_value = "Upload Cover Letter"
+    element.locator.return_value = ancestor
+
+    result = _get_input_label(page, element)
+    assert result == "Upload Cover Letter"
+    element.locator.assert_called_with("xpath=ancestor::label[1]")
+
+
+def test_get_input_label_via_aria_label():
+    """Falls back to aria-label attribute."""
+    from unittest.mock import MagicMock
+
+    from worker.tools.field_inspector_tool import _get_input_label
+
+    page = MagicMock()
+    element = MagicMock()
+    page.locator.side_effect = Exception("no label[for]")
+    ancestor = MagicMock()
+    ancestor.inner_text.side_effect = Exception("no ancestor")
+    element.locator.return_value = ancestor
+    element.get_attribute.side_effect = lambda attr: (
+        "Cover Letter File" if attr == "aria-label" else None
+    )
+
+    result = _get_input_label(page, element)
+    assert result == "Cover Letter File"
+
+
+def test_get_input_label_via_name():
+    """Falls back to name attribute when aria-label is absent."""
+    from unittest.mock import MagicMock
+
+    from worker.tools.field_inspector_tool import _get_input_label
+
+    page = MagicMock()
+    element = MagicMock()
+    page.locator.side_effect = Exception("no label[for]")
+    ancestor = MagicMock()
+    ancestor.inner_text.side_effect = Exception("no ancestor")
+    element.locator.return_value = ancestor
+    element.get_attribute.side_effect = lambda attr: (
+        "cover_letter_upload" if attr == "name" else None
+    )
+
+    result = _get_input_label(page, element)
+    assert result == "cover_letter_upload"
+
+
+def test_get_input_label_returns_empty_when_nothing_found():
+    """Returns empty string when no label source is available."""
+    from unittest.mock import MagicMock
+
+    from worker.tools.field_inspector_tool import _get_input_label
+
+    page = MagicMock()
+    element = MagicMock()
+    page.locator.side_effect = Exception("no label[for]")
+    element.locator.side_effect = Exception("no ancestor")
+    element.get_attribute.return_value = None
+
+    result = _get_input_label(page, element)
+    assert result == ""
+
+
 def test_tool_falls_back_to_domcontentloaded_on_networkidle_timeout():
     from worker.tools.field_inspector_tool import field_inspector_tool
 
