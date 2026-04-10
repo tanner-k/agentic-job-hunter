@@ -51,8 +51,9 @@ _TASK_INSPECT_DESCRIPTION = (
     "output an empty InspectedJobs list immediately without calling any tools.\n\n"
     "For EACH job block, call the Field Inspector tool exactly once with its URL.\n"
     "Do NOT skip any job. Do NOT call the tool more than once per URL.\n"
-    "Collect all results and output them as an InspectedJobs object with the form_fields "
-    "and requires_resume value returned by the tool for each job."
+    "Collect all results and output them as an InspectedJobs object with the "
+    "form_fields, requires_resume, requires_cover_letter, and job_description values "
+    "returned by the tool for each job."
 )
 
 _TASK_EVALUATE_DESCRIPTION = (
@@ -139,7 +140,10 @@ def run_crew(
     )
     task_inspect = Task(
         description=_TASK_INSPECT_DESCRIPTION,
-        expected_output="InspectedJobs JSON with form_fields and requires_resume for the job.",
+        expected_output=(
+            "InspectedJobs JSON with form_fields, requires_resume, requires_cover_letter, "
+            "and job_description for the job."
+        ),
         agent=field_inspector,
         output_pydantic=InspectedJobs,
     )
