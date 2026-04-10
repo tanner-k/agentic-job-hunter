@@ -137,12 +137,40 @@ def _inspector_work(url: str) -> str:
 
             try:
                 fields = _extract_fields(page)
-                requires_resume = page.locator("input[type=file]").count() > 0
+
+                # Extract visible page text for cover letter context
+                raw_text = page.evaluate("document.body.innerText") or ""
+                job_description = raw_text[:4000]
+
+                # Label-aware classification of file inputs and textareas
+                requires_resume = False
+                requires_cover_letter = False
+                for file_input in page.locator("input[type=file]").all():
+                    label_text = _get_input_label(page, file_input).lower()
+                    if "cover letter" in label_text:
+                        requires_cover_letter = True
+                    else:
+                        requires_resume = True
+                for textarea in page.locator("textarea").all():
+                    label_text = _get_input_label(page, textarea).lower()
+                    if "cover letter" in label_text:
+                        requires_cover_letter = True
             finally:
                 browser.close()
 
-        result = {"url": url, "form_fields": fields, "requires_resume": requires_resume}
-        logger.info("fields_extracted", url=url, field_count=len(fields))
+        result = {
+            "url": url,
+            "form_fields": fields,
+            "requires_resume": requires_resume,
+            "requires_cover_letter": requires_cover_letter,
+            "job_description": job_description,
+        }
+        logger.info(
+            "fields_extracted",
+            url=url,
+            field_count=len(fields),
+            requires_cover_letter=requires_cover_letter,
+        )
         return json.dumps(result)
 
     except Exception as exc:
@@ -152,6 +180,8 @@ def _inspector_work(url: str) -> str:
                 "url": url,
                 "form_fields": [],
                 "requires_resume": False,
+                "requires_cover_letter": False,
+                "job_description": "",
                 "error": str(exc),
             }
         )
@@ -178,6 +208,8 @@ def field_inspector_tool(url: str) -> str:
                     "url": url,
                     "form_fields": [],
                     "requires_resume": False,
+                    "requires_cover_letter": False,
+                    "job_description": "",
                     "error": "Field inspection timed out after 90 seconds",
                 }
             )
@@ -188,6 +220,8 @@ def field_inspector_tool(url: str) -> str:
                     "url": url,
                     "form_fields": [],
                     "requires_resume": False,
+                    "requires_cover_letter": False,
+                    "job_description": "",
                     "error": f"Inspector execution error: {exc}",
                 }
             )
