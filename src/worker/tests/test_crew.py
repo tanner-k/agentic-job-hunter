@@ -25,6 +25,9 @@ def test_run_crew_injects_personal_data_into_inputs(tmp_path):
         patch.object(crew_module, "build_searcher", return_value=MagicMock()),
         patch.object(crew_module, "build_field_inspector", return_value=MagicMock()),
         patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+        patch.object(
+            crew_module, "build_cover_letter_writer", return_value=MagicMock()
+        ),
         patch.object(crew_module, "build_browser", return_value=MagicMock()),
         patch.object(crew_module, "Task", return_value=MagicMock()),
         patch.object(crew_module, "Crew", return_value=mock_crew_instance),
@@ -46,28 +49,30 @@ def test_run_crew_injects_personal_data_into_inputs(tmp_path):
     assert loaded["First Name"] == "Tanner"
 
 
-def test_crew_has_four_tasks(tmp_path):
-    """Crew must be built with exactly 4 tasks."""
+def test_crew_has_five_tasks_in_normal_mode(tmp_path):
+    """Non-dry-run crew must include exactly 5 tasks (including Cover Letter Writer)."""
     import worker.crew as crew_module
     from worker.models.search_criteria import SearchCriteria
 
-    personal_data = {"First Name": "Tanner"}
     personal_file = tmp_path / "personal_data.json"
-    personal_file.write_text(json.dumps(personal_data))
+    personal_file.write_text('{"First Name": "Tanner"}')
 
     tasks_passed = []
 
     def capture_crew(**kwargs):
         tasks_passed.extend(kwargs.get("tasks", []))
-        crew = MagicMock()
-        crew.kickoff.return_value = MagicMock(__str__=lambda self: "done")
-        return crew
+        instance = MagicMock()
+        instance.kickoff.return_value = MagicMock(__str__=lambda self: "done")
+        return instance
 
     with (
         patch.object(crew_module, "settings") as mock_settings,
         patch.object(crew_module, "build_searcher", return_value=MagicMock()),
         patch.object(crew_module, "build_field_inspector", return_value=MagicMock()),
         patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+        patch.object(
+            crew_module, "build_cover_letter_writer", return_value=MagicMock()
+        ),
         patch.object(crew_module, "build_browser", return_value=MagicMock()),
         patch.object(crew_module, "Task", return_value=MagicMock()),
         patch.object(crew_module, "Crew", side_effect=capture_crew),
@@ -79,9 +84,50 @@ def test_crew_has_four_tasks(tmp_path):
             location="Remote",
             min_salary=100000,
             job_keywords=["Python"],
-            company="",
-            job_website="",
         )
         crew_module.run_crew(criteria)
 
-    assert len(tasks_passed) == 4
+    assert len(tasks_passed) == 5
+
+
+def test_crew_dry_run_has_three_tasks_and_excludes_cover_letter_writer(tmp_path):
+    """dry_run=True crew must have exactly 3 tasks (no CL writer, no Browser)."""
+    import worker.crew as crew_module
+    from worker.models.search_criteria import SearchCriteria
+
+    personal_file = tmp_path / "personal_data.json"
+    personal_file.write_text('{"First Name": "Tanner"}')
+
+    tasks_passed = []
+
+    def capture_crew(**kwargs):
+        tasks_passed.extend(kwargs.get("tasks", []))
+        mock_task_eval = MagicMock()
+        mock_task_eval.output.pydantic = MagicMock()
+        instance = MagicMock()
+        instance.kickoff.return_value = MagicMock()
+        return instance
+
+    with (
+        patch.object(crew_module, "settings") as mock_settings,
+        patch.object(crew_module, "build_searcher", return_value=MagicMock()),
+        patch.object(crew_module, "build_field_inspector", return_value=MagicMock()),
+        patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+        patch.object(
+            crew_module, "build_cover_letter_writer", return_value=MagicMock()
+        ),
+        patch.object(crew_module, "build_browser", return_value=MagicMock()),
+        patch.object(crew_module, "Task", return_value=MagicMock()),
+        patch.object(crew_module, "Crew", side_effect=capture_crew),
+        patch.object(crew_module, "set_current_task_id"),
+    ):
+        mock_settings.personal_data_path = personal_file
+        criteria = SearchCriteria(
+            job_title="Engineer",
+            location="Remote",
+            min_salary=100000,
+            job_keywords=["Python"],
+        )
+        crew_module.run_crew(criteria, dry_run=True)
+
+    assert len(tasks_passed) == 3

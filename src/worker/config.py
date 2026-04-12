@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     resume_path: Path = Path("./worker/personal/resume.pdf")
     personal_data_path: Path = Path("./worker/personal/personal_data.json")
 
+    # Cover letter
+    cover_letter_context_path: Path = Path("./worker/personal/cover_letter_context.md")
+    cover_letter_output_dir: Path = Path("./worker/personal/cover_letters")
+
     # Email agent
     email_poll_interval_seconds: int = 7200  # 2 hours
 

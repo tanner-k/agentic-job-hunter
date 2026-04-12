@@ -17,6 +17,8 @@ jobs:
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.11.6"
 
       - name: Add pip-audit
         run: uv add --dev pip-audit
@@ -25,5 +27,10 @@ jobs:
         run: |
           # GHSA-w8v5-vhqr-4h9v: diskcache 5.6.3 — no patched version exists upstream yet
           # (transitive dep via crewai → instructor). Re-evaluate when diskcache >5.6.3 releases.
+          # GHSA-pjjw-68hj-v9mw: uv — pip-audit scans the uv binary itself, which is a CI tool
+          # not a Python dependency. Fixed in uv 0.11.6 but pip-audit may still flag the runner binary.
           # --skip-editable suppresses the expected "not on PyPI" notice for this local package.
-          uv run pip-audit --ignore-vuln GHSA-w8v5-vhqr-4h9v --skip-editable
+          uv run pip-audit \
+            --ignore-vuln GHSA-w8v5-vhqr-4h9v \
+            --ignore-vuln GHSA-pjjw-68hj-v9mw \
+            --skip-editable

@@ -58,6 +58,26 @@ class TestSettingsDefaults:
         )
         assert settings.log_level == "INFO"
 
+    def test_default_cover_letter_context_path(self, required_env: None) -> None:
+        settings = Settings(
+            supabase_url="https://test.supabase.co",
+            supabase_key="key",
+            supabase_service_role_key="srk",
+        )
+        assert settings.cover_letter_context_path == Path(
+            "./worker/personal/cover_letter_context.md"
+        )
+
+    def test_default_cover_letter_output_dir(self, required_env: None) -> None:
+        settings = Settings(
+            supabase_url="https://test.supabase.co",
+            supabase_key="key",
+            supabase_service_role_key="srk",
+        )
+        assert settings.cover_letter_output_dir == Path(
+            "./worker/personal/cover_letters"
+        )
+
 
 class TestSettingsFromEnv:
     def test_supabase_url_read_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
