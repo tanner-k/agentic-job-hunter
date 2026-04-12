@@ -14,6 +14,8 @@ class ApplicationResult:
     requires_resume: bool = False
     error_message: str | None = None
     applied_at: datetime | None = None
+    failed: bool = False
+    failed_reason: str | None = None
 
     def __post_init__(self) -> None:
         # Use object.__setattr__ because dataclass is frozen
