@@ -131,3 +131,64 @@ def test_crew_dry_run_has_three_tasks_and_excludes_cover_letter_writer(tmp_path)
         crew_module.run_crew(criteria, dry_run=True)
 
     assert len(tasks_passed) == 3
+
+
+def test_failure_logger_called_when_inspect_step_fails(tmp_path):
+    """FailureLogger.log must be called when task_inspect.output.pydantic has failed=True."""
+    import worker.crew as crew_module
+    from worker.models.inspected_job import InspectedJobs
+    from worker.models.search_criteria import SearchCriteria
+
+    personal_file = tmp_path / "personal_data.json"
+    personal_file.write_text('{"First Name": "Tanner"}')
+
+    # Build a failed InspectedJobs pydantic output
+    failed_inspect = InspectedJobs(
+        jobs=[], failed=True, failed_reason="no fields found"
+    )
+
+    # Task mock whose .output.pydantic returns the failed inspect object
+    mock_task_inspect = MagicMock()
+    mock_task_inspect.output.pydantic = failed_inspect
+
+    task_call_count = 0
+
+    def make_task(*args, **kwargs):
+        nonlocal task_call_count
+        task_call_count += 1
+        # Return mock_task_inspect for the second Task() call (inspect step)
+        if task_call_count == 2:
+            return mock_task_inspect
+        return MagicMock()
+
+    mock_crew_instance = MagicMock()
+    mock_crew_instance.kickoff.return_value = MagicMock()
+
+    with (
+        patch.object(crew_module, "settings") as mock_settings,
+        patch.object(crew_module, "build_searcher", return_value=MagicMock()),
+        patch.object(crew_module, "build_field_inspector", return_value=MagicMock()),
+        patch.object(crew_module, "build_evaluator", return_value=MagicMock()),
+        patch.object(
+            crew_module, "build_cover_letter_writer", return_value=MagicMock()
+        ),
+        patch.object(crew_module, "build_browser", return_value=MagicMock()),
+        patch.object(crew_module, "Task", side_effect=make_task),
+        patch.object(crew_module, "Crew", return_value=mock_crew_instance),
+        patch.object(crew_module, "set_current_task_id"),
+        patch.object(crew_module, "_failure_logger") as mock_failure_logger,
+    ):
+        mock_settings.personal_data_path = personal_file
+        criteria = SearchCriteria(
+            job_title="Engineer",
+            location="Remote",
+            min_salary=100000,
+            job_keywords=["Python"],
+        )
+        crew_module.run_crew(criteria)
+
+    mock_failure_logger.log.assert_called_once()
+    call_args = mock_failure_logger.log.call_args[0][0]
+    assert call_args.step == "field_inspector"
+    assert call_args.failed is True
+    assert call_args.failed_reason == "no fields found"

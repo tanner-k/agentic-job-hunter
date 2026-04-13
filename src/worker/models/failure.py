@@ -16,7 +16,8 @@ class FailureRecord(BaseModel, frozen=True):
     """Human-readable description of why the step failed. Required when failed=True."""
 
     job_url: str
-    """URL of the job posting being processed when the failure occurred."""
+    """URL of the job posting being processed when the failure occurred.
+Use 'unknown' when no URL is available (e.g. the step failed before any job URL was resolved)."""
 
     timestamp: datetime
     """UTC timestamp of when the failure was recorded."""
