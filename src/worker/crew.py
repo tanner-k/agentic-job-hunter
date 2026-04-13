@@ -1,4 +1,6 @@
+import contextlib
 import json
+from datetime import UTC, datetime
 
 from crewai import Crew, Process, Task
 
@@ -8,13 +10,16 @@ from worker.agents.evaluator import build_evaluator
 from worker.agents.field_inspector import build_field_inspector
 from worker.agents.searcher import build_searcher
 from worker.config import settings
+from worker.logging.failure_logger import FailureLogger
 from worker.logging_config import get_logger
 from worker.models.application_packet import ApplicationPackets
+from worker.models.failure import FailureRecord
 from worker.models.inspected_job import InspectedJobs
 from worker.models.search_criteria import SearchCriteria
 from worker.tools.browser_tool import set_current_task_id
 
 logger = get_logger(__name__)
+_failure_logger = FailureLogger()
 
 _TASK_SEARCH_DESCRIPTION = (
     "Search for open positions using the following mandatory criteria:\n"
@@ -240,6 +245,36 @@ def run_crew(
     finally:
         set_current_task_id(None)
 
+    # Log inspect step failure
+    inspect_out: InspectedJobs | None = task_inspect.output.pydantic  # type: ignore[assignment, union-attr]
+    if inspect_out is not None and inspect_out.failed:
+        with contextlib.suppress(Exception):
+            _failure_logger.log(
+                FailureRecord(
+                    step="field_inspector",
+                    failed=inspect_out.failed,
+                    failed_reason=inspect_out.failed_reason,
+                    job_url=inspect_out.jobs[0].url if inspect_out.jobs else "unknown",
+                    timestamp=datetime.now(tz=UTC),
+                )
+            )
+
+    # Log evaluate step failure
+    evaluate_out: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment, union-attr]
+    if evaluate_out is not None and evaluate_out.failed:
+        with contextlib.suppress(Exception):
+            _failure_logger.log(
+                FailureRecord(
+                    step="evaluator",
+                    failed=evaluate_out.failed,
+                    failed_reason=evaluate_out.failed_reason,
+                    job_url=evaluate_out.job_applications[0].url
+                    if evaluate_out.job_applications
+                    else "unknown",
+                    timestamp=datetime.now(tz=UTC),
+                )
+            )
+
     if dry_run:
         try:
             packets: ApplicationPackets | None = task_evaluate.output.pydantic  # type: ignore[assignment, union-attr]
@@ -247,6 +282,22 @@ def run_crew(
             return packets
         except Exception:
             return None
+
+    # Log cover_letter step failure (non-dry-run only)
+    cover_out: ApplicationPackets | None = task_cover_letter.output.pydantic  # type: ignore[assignment, union-attr]
+    if cover_out is not None and cover_out.failed:
+        with contextlib.suppress(Exception):
+            _failure_logger.log(
+                FailureRecord(
+                    step="cover_letter_writer",
+                    failed=cover_out.failed,
+                    failed_reason=cover_out.failed_reason,
+                    job_url=cover_out.job_applications[0].url
+                    if cover_out.job_applications
+                    else "unknown",
+                    timestamp=datetime.now(tz=UTC),
+                )
+            )
 
     # Extract the company that was applied to so the caller can exclude it next round.
     company: str | None = None

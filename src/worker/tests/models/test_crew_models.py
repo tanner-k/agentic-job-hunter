@@ -195,3 +195,184 @@ def test_build_field_inspector_returns_agent():
     assert agent.role == "Form Field Inspector"
     assert agent.max_iter == 8
     assert agent.allow_delegation is False
+
+
+# Tests for failed / failed_reason fields
+
+
+def test_job_listing_has_failure_fields():
+    from worker.models.job_listing import JobListing
+
+    job = JobListing(url="https://example.com", company="Acme", job_title="Engineer")
+    assert job.failed is False
+    assert job.failed_reason is None
+
+
+def test_job_listing_can_signal_failure():
+    from worker.models.job_listing import JobListing
+
+    job = JobListing(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        failed=True,
+        failed_reason="LLM hallucinated empty response",
+    )
+    assert job.failed is True
+    assert job.failed_reason == "LLM hallucinated empty response"
+
+
+def test_search_results_has_failure_fields():
+    from worker.models.job_listing import SearchResults
+
+    results = SearchResults(jobs=[])
+    assert results.failed is False
+    assert results.failed_reason is None
+
+
+def test_search_results_can_signal_failure():
+    from worker.models.job_listing import SearchResults
+
+    results = SearchResults(
+        jobs=[],
+        failed=True,
+        failed_reason="Search timeout after 30 seconds",
+    )
+    assert results.failed is True
+    assert results.failed_reason == "Search timeout after 30 seconds"
+
+
+def test_inspected_job_has_failure_fields():
+    from worker.models.inspected_job import InspectedJob
+
+    job = InspectedJob(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        form_fields=["Email"],
+        requires_resume=False,
+        requires_cover_letter=False,
+        job_description="",
+    )
+    assert job.failed is False
+    assert job.failed_reason is None
+
+
+def test_inspected_job_can_signal_failure():
+    from worker.models.inspected_job import InspectedJob
+
+    job = InspectedJob(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        form_fields=[],
+        requires_resume=False,
+        requires_cover_letter=False,
+        job_description="",
+        failed=True,
+        failed_reason="Page failed to load after 3 retries",
+    )
+    assert job.failed is True
+    assert job.failed_reason == "Page failed to load after 3 retries"
+
+
+def test_inspected_jobs_has_failure_fields():
+    from worker.models.inspected_job import InspectedJobs
+
+    jobs = InspectedJobs(jobs=[])
+    assert jobs.failed is False
+    assert jobs.failed_reason is None
+
+
+def test_inspected_jobs_can_signal_failure():
+    from worker.models.inspected_job import InspectedJobs
+
+    jobs = InspectedJobs(
+        jobs=[],
+        failed=True,
+        failed_reason="Inspector crashed on malformed HTML",
+    )
+    assert jobs.failed is True
+    assert jobs.failed_reason == "Inspector crashed on malformed HTML"
+
+
+def test_application_packet_has_failure_fields():
+    import json
+
+    from worker.models.application_packet import ApplicationPacket
+
+    packet = ApplicationPacket(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        json_instructions=json.dumps({"Email": "t@example.com"}),
+        requires_resume=False,
+    )
+    assert packet.failed is False
+    assert packet.failed_reason is None
+
+
+def test_application_packet_can_signal_failure():
+    import json
+
+    from worker.models.application_packet import ApplicationPacket
+
+    packet = ApplicationPacket(
+        url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        json_instructions=json.dumps({"Email": "t@example.com"}),
+        requires_resume=False,
+        failed=True,
+        failed_reason="Could not parse application form",
+    )
+    assert packet.failed is True
+    assert packet.failed_reason == "Could not parse application form"
+
+
+def test_application_packets_has_failure_fields():
+    from worker.models.application_packet import ApplicationPackets
+
+    packets = ApplicationPackets(job_applications=[])
+    assert packets.failed is False
+    assert packets.failed_reason is None
+
+
+def test_application_packets_can_signal_failure():
+    from worker.models.application_packet import ApplicationPackets
+
+    packets = ApplicationPackets(
+        job_applications=[],
+        failed=True,
+        failed_reason="Evaluator failed to prepare application packets",
+    )
+    assert packets.failed is True
+    assert packets.failed_reason == "Evaluator failed to prepare application packets"
+
+
+def test_application_result_has_failure_fields():
+    from worker.models.application_result import ApplicationResult
+
+    result = ApplicationResult(
+        job_url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        status="applied",
+    )
+    assert result.failed is False
+    assert result.failed_reason is None
+
+
+def test_application_result_can_signal_failure():
+    from worker.models.application_result import ApplicationResult
+
+    result = ApplicationResult(
+        job_url="https://example.com",
+        company="Acme",
+        job_title="Engineer",
+        status="failed",
+        failed=True,
+        failed_reason="Browser submission failed: network timeout",
+    )
+    assert result.failed is True
+    assert result.failed_reason == "Browser submission failed: network timeout"
