@@ -35,18 +35,20 @@ graph TD
     C --> D[Searcher Agent\nDDGS subprocess search]
     D --> E[Field Inspector Agent\nPlaywright DOM field extraction]
     E --> F[Evaluator Agent\nResume Match + Form Instructions]
-    F --> G[Browser Agent\nPlaywright Form Filler]
-    G -->|applications table| A
-    H[Gmail] -->|every 2 hours| I[Email Agent\nClassify + Draft Reply]
-    I -->|email_logs table| A
+    F --> G[Cover Letter Writer Agent\nDraft + render cover letter PDF]
+    G --> H[Browser Agent\nPlaywright Form Filler]
+    H -->|applications table| A
+    I[Gmail] -->|every 2 hours| J[Email Agent\nClassify + Draft Reply]
+    J -->|email_logs table| A
 ```
 
-The worker polls Supabase for tasks with `status = "pending"`. For each task it spins up a CrewAI crew with four sequential agents:
+The worker polls Supabase for tasks with `status = "pending"`. For each task it spins up a CrewAI crew with five sequential agents:
 
 1. **Searcher** — queries DuckDuckGo for job listings via `ddgs.DDGS` running in an isolated child process. Each query has a 15-second hard timeout (the subprocess is killed if it hangs) and calls are serialized through a threading lock with a 3-second rate-limit delay. Finds the single best matching job per cycle; the worker runs up to 10 cycles per task, building an exclusion list so the same company is never targeted twice.
 2. **Field Inspector** — visits each job URL with a headless Chromium browser, clicks through listing pages to the actual application form, and extracts the exact form field labels from the rendered DOM (`<label>` text, `placeholder`, `aria-label`, `name` attributes). Also detects whether a resume upload field is present. Runs Playwright inside a `ThreadPoolExecutor` to avoid conflicts with CrewAI's asyncio event loop. Results are returned as a structured `InspectedJobs` Pydantic model.
 3. **Evaluator** — receives the inspected field lists, filters out listings that don't meet your salary/keyword criteria, and maps your personal data to the exact field names found on each form. Produces an `ApplicationPackets` Pydantic model with per-field fill instructions.
-4. **Browser** — drives a headless Chromium browser via Playwright, navigates to each job URL, fills in form fields using the evaluator's instructions, and submits the application.
+4. **Cover Letter Writer** — if the application requires a cover letter, reads your resume and personal background context, drafts a tailored letter, and renders it to a PDF via the `cover_letter_renderer` tool. If PDF rendering fails the text is preserved and `cover_letter_path` is set to `null` so the Browser agent can proceed without blocking.
+5. **Browser** — drives a headless Chromium browser via Playwright, navigates to each job URL, fills in form fields using the evaluator's instructions (attaching the cover letter PDF when a file upload field was detected), and submits the application.
 
 Results are written back to Supabase and surface immediately in the dashboard.
 
