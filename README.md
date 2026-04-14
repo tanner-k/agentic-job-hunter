@@ -229,13 +229,15 @@ The email agent uses Gmail OAuth to monitor your inbox for recruiter messages.
 
 ## Database Setup
 
-Migrations live in `supabase/migrations/`. To set up the schema:
+Migrations live in `src/supabase/migrations/`. To set up the schema:
 
 1. Open your Supabase project dashboard
 2. Go to **SQL Editor**
-3. Copy and run the contents of `supabase/migrations/0001_initial.sql`
-
-This creates the `search_tasks`, `applications`, and `email_logs` tables with appropriate indexes and Row Level Security policies.
+3. Copy and run each migration in order:
+   - `001_initial_schema.sql` — creates `search_tasks`, `applications`, and `email_logs` tables with RLS policies
+   - `002_add_retry_count.sql` — adds retry tracking columns to `applications`
+   - `003_enable_realtime.sql` — enables Supabase Realtime on relevant tables
+   - `004_add_failure_logs_table.sql` — creates the `failure_logs` table for pipeline error tracking
 
 ## Project Structure
 
