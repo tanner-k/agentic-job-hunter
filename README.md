@@ -111,9 +111,12 @@ ollama pull gemma4:e4b
 cp .env.example .env
 # Edit .env with your Supabase credentials (see Configuration below)
 
-# 6. Run the Supabase migration
-# In the Supabase dashboard SQL editor, paste and run:
-# supabase/migrations/0001_initial.sql
+# 6. Run the Supabase migrations
+# In the Supabase dashboard SQL editor, run each file in order:
+# src/supabase/migrations/001_initial_schema.sql
+# src/supabase/migrations/002_add_retry_count.sql
+# src/supabase/migrations/003_enable_realtime.sql
+# src/supabase/migrations/004_add_failure_logs_table.sql
 
 # 7. Add your personal files
 # See Configuration -> personal_data.json below
