@@ -151,7 +151,7 @@ npm run dev
 
 ### personal_data.json
 
-The browser agent uses this file to populate form fields like name, email, phone, and LinkedIn URL. Create it at `worker/personal/personal_data.json`:
+The browser agent uses this file to populate form fields like name, email, phone, and LinkedIn URL. Create it at `src/worker/personal/personal_data.json`:
 
 ```json
 {
