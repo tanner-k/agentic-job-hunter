@@ -345,7 +345,7 @@ uv run ruff format .
 **Type check:**
 
 ```bash
-uv run mypy worker/
+uv run mypy src/worker/
 ```
 
 ## Contributing
