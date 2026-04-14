@@ -247,56 +247,72 @@ agent-job-finder/
 │   └── workflows/
 │       ├── ci.yml              # Lint, type check, test on PRs
 │       └── security.yml        # pip-audit on PRs and weekly
-├── dashboard/                  # Next.js frontend
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   └── package.json
 ├── docs/                       # Screenshots and assets
-├── supabase/
-│   └── migrations/
-│       └── 0001_initial.sql
-├── worker/
-│   ├── agents/                 # CrewAI agent definitions
-│   │   ├── browser.py
-│   │   ├── email_agent.py      # Gmail classifier + draft reply (optional)
-│   │   ├── evaluator.py
-│   │   ├── field_inspector.py
-│   │   └── searcher.py
-│   ├── db/
-│   │   ├── client.py           # Supabase client singleton
-│   │   └── repository.py       # Data access layer
-│   ├── models/                 # Frozen Pydantic / dataclass models
-│   │   ├── application_packet.py   # ApplicationPacket + ApplicationPackets
-│   │   ├── application_result.py
-│   │   ├── email_log.py
-│   │   ├── inspected_job.py        # InspectedJob + InspectedJobs
-│   │   ├── job_listing.py
-│   │   └── search_criteria.py
-│   ├── personal/               # Gitignored — resume, credentials, personal data
-│   ├── tests/
-│   │   ├── models/
-│   │   ├── tools/
-│   │   ├── test_config.py
-│   │   ├── test_crew.py
-│   │   └── test_repository.py
-│   ├── tools/                  # CrewAI tool implementations
-│   │   ├── browser_tool.py     # Playwright form filler
-│   │   ├── browser_utils.py    # Click-through-to-form helpers
-│   │   ├── field_inspector_tool.py
-│   │   ├── resume_loader.py
-│   │   └── search_tool.py      # DuckDuckGo subprocess search
-│   ├── config.py               # pydantic-settings Settings class
-│   ├── crew.py                 # CrewAI crew factory + run_crew()
-│   ├── logging_config.py       # structlog setup
-│   └── main.py                 # Worker entry point
+├── ops/                        # Deployment, monitoring
+├── planning/                   # Specs and architecture decisions
+├── src/
+│   ├── dashboard/              # Next.js frontend
+│   │   ├── app/
+│   │   │   ├── admin/          # Admin pages (applications, emails, search)
+│   │   │   ├── auth/           # OAuth callback route
+│   │   │   └── login/
+│   │   └── package.json
+│   ├── supabase/
+│   │   └── migrations/
+│   │       ├── 001_initial_schema.sql
+│   │       ├── 002_add_retry_count.sql
+│   │       ├── 003_enable_realtime.sql
+│   │       └── 004_add_failure_logs_table.sql
+│   └── worker/
+│       ├── agents/             # CrewAI agent definitions
+│       │   ├── browser.py
+│       │   ├── cover_letter_writer.py  # Cover letter draft + PDF render
+│       │   ├── email_agent.py
+│       │   ├── evaluator.py
+│       │   ├── field_inspector.py
+│       │   └── searcher.py
+│       ├── db/
+│       │   ├── client.py       # Supabase client singleton
+│       │   └── repository.py   # Data access layer
+│       ├── logging/            # structlog configuration helpers
+│       ├── models/             # Frozen Pydantic models
+│       │   ├── application_packet.py
+│       │   ├── application_result.py
+│       │   ├── email_log.py
+│       │   ├── failure.py          # FailureLog model
+│       │   ├── inspected_job.py
+│       │   ├── job.py
+│       │   ├── job_listing.py
+│       │   └── search_criteria.py
+│       ├── personal/           # Gitignored — resume, credentials, personal data
+│       ├── screenshots/        # Playwright debug screenshots (gitignored)
+│       ├── tests/
+│       │   ├── models/
+│       │   ├── tools/
+│       │   ├── test_config.py
+│       │   ├── test_crew.py
+│       │   └── test_repository.py
+│       ├── tools/              # CrewAI tool implementations
+│       │   ├── browser_tool.py
+│       │   ├── browser_utils.py
+│       │   ├── cover_letter_context_loader.py  # Loads personal context for cover letters
+│       │   ├── cover_letter_renderer.py        # Renders cover letter text to PDF
+│       │   ├── field_inspector_tool.py
+│       │   ├── resume_loader.py
+│       │   ├── search_tool.py
+│       │   └── stealth.py          # Playwright stealth / bot-detection evasion
+│       ├── config.py
+│       ├── crew.py
+│       ├── logging_config.py
+│       └── main.py
 ├── .env.example
 ├── .pre-commit-config.yaml
 ├── CONTRIBUTING.md
-├── HANDOFF.md                  # Session notes and known issues
+├── HANDOFF.md
 ├── LICENSE
+├── main.py                     # Top-level entry point
 ├── pyproject.toml
-├── search_criteria.csv         # Example criteria input
+├── search_criteria.csv
 └── uv.lock
 ```
 
