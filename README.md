@@ -117,13 +117,14 @@ cp .env.example .env
 
 # 7. Add your personal files
 # See Configuration -> personal_data.json below
-cp /path/to/your/resume.pdf worker/personal/resume.pdf
+cp /path/to/your/resume.pdf src/worker/personal/resume.pdf
 
 # 8. Start the worker
+cd src
 uv run python -m worker.main
 
 # 9. Start the dashboard (separate terminal)
-cd dashboard
+cd src/dashboard
 npm install
 npm run dev
 # Open http://localhost:3000
@@ -141,11 +142,11 @@ npm run dev
 | `FAST_MODEL` | Ollama model for lightweight tasks | No | `ollama/qwen3.5:9b` |
 | `REASONING_MODEL` | Ollama model for evaluation/reasoning | No | `ollama/gemma4:e4b` |
 | `OLLAMA_BASE_URL` | Ollama API base URL | No | `http://localhost:11434` |
-| `RESUME_PATH` | Path to your resume PDF | No | `./worker/personal/resume.pdf` |
-| `PERSONAL_DATA_PATH` | Path to personal_data.json | No | `./worker/personal/personal_data.json` |
+| `RESUME_PATH` | Path to your resume PDF | No | `./src/worker/personal/resume.pdf` |
+| `PERSONAL_DATA_PATH` | Path to personal_data.json | No | `./src/worker/personal/personal_data.json` |
 | `EMAIL_POLL_INTERVAL_SECONDS` | How often to check Gmail | No | `7200` |
-| `GMAIL_CREDENTIALS_PATH` | Path to Gmail OAuth credentials | No | `./worker/personal/credentials.json` |
-| `GMAIL_TOKEN_PATH` | Path to Gmail OAuth token cache | No | `./worker/personal/token.json` |
+| `GMAIL_CREDENTIALS_PATH` | Path to Gmail OAuth credentials | No | `./src/worker/personal/credentials.json` |
+| `GMAIL_TOKEN_PATH` | Path to Gmail OAuth token cache | No | `./src/worker/personal/token.json` |
 | `LOG_LEVEL` | Logging verbosity | No | `INFO` |
 
 ### personal_data.json
@@ -169,7 +170,7 @@ The browser agent uses this file to populate form fields like name, email, phone
 }
 ```
 
-The `worker/personal/` directory is gitignored — your personal data never leaves your machine.
+The `src/worker/personal/` directory is gitignored — your personal data never leaves your machine.
 
 ### Ollama Models
 
@@ -183,6 +184,7 @@ You can substitute any model supported by Ollama by updating the `FAST_MODEL` an
 ## Running the Worker
 
 ```bash
+cd src
 uv run python -m worker.main
 ```
 
@@ -201,7 +203,7 @@ Use the dashboard to create search tasks and monitor results in real time.
 **Development:**
 
 ```bash
-cd dashboard
+cd src/dashboard
 npm install
 npm run dev
 # Open http://localhost:3000
@@ -221,8 +223,8 @@ The email agent uses Gmail OAuth to monitor your inbox for recruiter messages.
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable the **Gmail API**
 3. Create OAuth 2.0 credentials (Desktop application type)
-4. Download `credentials.json` and place it at `worker/personal/credentials.json`
-5. On first run the worker will open a browser window for OAuth consent — the token is cached at `worker/personal/token.json`
+4. Download `credentials.json` and place it at `src/worker/personal/credentials.json`
+5. On first run the worker will open a browser window for OAuth consent — the token is cached at `src/worker/personal/token.json`
 6. Set `EMAIL_POLL_INTERVAL_SECONDS` to control how often Gmail is checked (default: every 2 hours)
 
 ## Database Setup
