@@ -61,6 +61,7 @@ Results are written back to Supabase and surface immediately in the dashboard.
 - **Headless browser automation** — Playwright fills and submits real web forms, not just job board APIs
 - **Structured application tracking** — every attempt (applied, failed, skipped) is persisted to Supabase with timestamps and error context
 - **Email agent** — Gmail integration classifies recruiter messages and drafts replies on a configurable poll interval
+- **Cover letter generation** — when a job application requires a cover letter, a dedicated agent reads your resume and drafts a tailored letter, rendering it to a PDF for upload
 - **Admin dashboard** — Next.js frontend shows application status, task queue, and email logs
 - **Immutable data models** — frozen dataclasses throughout the worker prevent accidental state mutation
 - **Structured logging** — `structlog` JSON output makes log aggregation and debugging straightforward
