@@ -36,3 +36,6 @@ agent_search.ipynb
 
 # Legacy root entrypoint (replaced by worker module)
 /main.py
+
+# Git worktrees
+.worktrees/

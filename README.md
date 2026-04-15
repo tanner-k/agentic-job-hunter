@@ -35,18 +35,20 @@ graph TD
     C --> D[Searcher Agent\nDDGS subprocess search]
     D --> E[Field Inspector Agent\nPlaywright DOM field extraction]
     E --> F[Evaluator Agent\nResume Match + Form Instructions]
-    F --> G[Browser Agent\nPlaywright Form Filler]
-    G -->|applications table| A
-    H[Gmail] -->|every 2 hours| I[Email Agent\nClassify + Draft Reply]
-    I -->|email_logs table| A
+    F --> G[Cover Letter Writer Agent\nDraft + render cover letter PDF]
+    G --> H[Browser Agent\nPlaywright Form Filler]
+    H -->|applications table| A
+    I[Gmail] -->|every 2 hours| J[Email Agent\nClassify + Draft Reply]
+    J -->|email_logs table| A
 ```
 
-The worker polls Supabase for tasks with `status = "pending"`. For each task it spins up a CrewAI crew with four sequential agents:
+The worker polls Supabase for tasks with `status = "pending"`. For each task it spins up a CrewAI crew with five sequential agents:
 
 1. **Searcher** — queries DuckDuckGo for job listings via `ddgs.DDGS` running in an isolated child process. Each query has a 15-second hard timeout (the subprocess is killed if it hangs) and calls are serialized through a threading lock with a 3-second rate-limit delay. Finds the single best matching job per cycle; the worker runs up to 10 cycles per task, building an exclusion list so the same company is never targeted twice.
 2. **Field Inspector** — visits each job URL with a headless Chromium browser, clicks through listing pages to the actual application form, and extracts the exact form field labels from the rendered DOM (`<label>` text, `placeholder`, `aria-label`, `name` attributes). Also detects whether a resume upload field is present. Runs Playwright inside a `ThreadPoolExecutor` to avoid conflicts with CrewAI's asyncio event loop. Results are returned as a structured `InspectedJobs` Pydantic model.
 3. **Evaluator** — receives the inspected field lists, filters out listings that don't meet your salary/keyword criteria, and maps your personal data to the exact field names found on each form. Produces an `ApplicationPackets` Pydantic model with per-field fill instructions.
-4. **Browser** — drives a headless Chromium browser via Playwright, navigates to each job URL, fills in form fields using the evaluator's instructions, and submits the application.
+4. **Cover Letter Writer** — if the application requires a cover letter, reads your resume and personal background context, drafts a tailored letter, and renders it to a PDF via the `cover_letter_renderer` tool. If PDF rendering fails the text is preserved and `cover_letter_path` is set to `null` so the Browser agent can proceed without blocking.
+5. **Browser** — drives a headless Chromium browser via Playwright, navigates to each job URL, fills in form fields using the evaluator's instructions (attaching the cover letter PDF when a file upload field was detected), and submits the application.
 
 Results are written back to Supabase and surface immediately in the dashboard.
 
@@ -59,6 +61,7 @@ Results are written back to Supabase and surface immediately in the dashboard.
 - **Headless browser automation** — Playwright fills and submits real web forms, not just job board APIs
 - **Structured application tracking** — every attempt (applied, failed, skipped) is persisted to Supabase with timestamps and error context
 - **Email agent** — Gmail integration classifies recruiter messages and drafts replies on a configurable poll interval
+- **Cover letter generation** — when a job application requires a cover letter, a dedicated agent reads your resume and drafts a tailored letter, rendering it to a PDF for upload
 - **Admin dashboard** — Next.js frontend shows application status, task queue, and email logs
 - **Immutable data models** — frozen dataclasses throughout the worker prevent accidental state mutation
 - **Structured logging** — `structlog` JSON output makes log aggregation and debugging straightforward
@@ -108,19 +111,23 @@ ollama pull gemma4:e4b
 cp .env.example .env
 # Edit .env with your Supabase credentials (see Configuration below)
 
-# 6. Run the Supabase migration
-# In the Supabase dashboard SQL editor, paste and run:
-# supabase/migrations/0001_initial.sql
+# 6. Run the Supabase migrations
+# In the Supabase dashboard SQL editor, run each file in order:
+# src/supabase/migrations/001_initial_schema.sql
+# src/supabase/migrations/002_add_retry_count.sql
+# src/supabase/migrations/003_enable_realtime.sql
+# src/supabase/migrations/004_add_failure_logs_table.sql
 
 # 7. Add your personal files
 # See Configuration -> personal_data.json below
-cp /path/to/your/resume.pdf worker/personal/resume.pdf
+cp /path/to/your/resume.pdf src/worker/personal/resume.pdf
 
 # 8. Start the worker
+cd src
 uv run python -m worker.main
 
 # 9. Start the dashboard (separate terminal)
-cd dashboard
+cd src/dashboard
 npm install
 npm run dev
 # Open http://localhost:3000
@@ -138,16 +145,16 @@ npm run dev
 | `FAST_MODEL` | Ollama model for lightweight tasks | No | `ollama/qwen3.5:9b` |
 | `REASONING_MODEL` | Ollama model for evaluation/reasoning | No | `ollama/gemma4:e4b` |
 | `OLLAMA_BASE_URL` | Ollama API base URL | No | `http://localhost:11434` |
-| `RESUME_PATH` | Path to your resume PDF | No | `./worker/personal/resume.pdf` |
-| `PERSONAL_DATA_PATH` | Path to personal_data.json | No | `./worker/personal/personal_data.json` |
+| `RESUME_PATH` | Path to your resume PDF | No | `./src/worker/personal/resume.pdf` |
+| `PERSONAL_DATA_PATH` | Path to personal_data.json | No | `./src/worker/personal/personal_data.json` |
 | `EMAIL_POLL_INTERVAL_SECONDS` | How often to check Gmail | No | `7200` |
-| `GMAIL_CREDENTIALS_PATH` | Path to Gmail OAuth credentials | No | `./worker/personal/credentials.json` |
-| `GMAIL_TOKEN_PATH` | Path to Gmail OAuth token cache | No | `./worker/personal/token.json` |
+| `GMAIL_CREDENTIALS_PATH` | Path to Gmail OAuth credentials | No | `./src/worker/personal/credentials.json` |
+| `GMAIL_TOKEN_PATH` | Path to Gmail OAuth token cache | No | `./src/worker/personal/token.json` |
 | `LOG_LEVEL` | Logging verbosity | No | `INFO` |
 
 ### personal_data.json
 
-The browser agent uses this file to populate form fields like name, email, phone, and LinkedIn URL. Create it at `worker/personal/personal_data.json`:
+The browser agent uses this file to populate form fields like name, email, phone, and LinkedIn URL. Create it at `src/worker/personal/personal_data.json`:
 
 ```json
 {
@@ -166,7 +173,7 @@ The browser agent uses this file to populate form fields like name, email, phone
 }
 ```
 
-The `worker/personal/` directory is gitignored — your personal data never leaves your machine.
+The `src/worker/personal/` directory is gitignored — your personal data never leaves your machine.
 
 ### Ollama Models
 
@@ -180,6 +187,7 @@ You can substitute any model supported by Ollama by updating the `FAST_MODEL` an
 ## Running the Worker
 
 ```bash
+cd src
 uv run python -m worker.main
 ```
 
@@ -198,7 +206,7 @@ Use the dashboard to create search tasks and monitor results in real time.
 **Development:**
 
 ```bash
-cd dashboard
+cd src/dashboard
 npm install
 npm run dev
 # Open http://localhost:3000
@@ -218,19 +226,21 @@ The email agent uses Gmail OAuth to monitor your inbox for recruiter messages.
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
 2. Enable the **Gmail API**
 3. Create OAuth 2.0 credentials (Desktop application type)
-4. Download `credentials.json` and place it at `worker/personal/credentials.json`
-5. On first run the worker will open a browser window for OAuth consent — the token is cached at `worker/personal/token.json`
+4. Download `credentials.json` and place it at `src/worker/personal/credentials.json`
+5. On first run the worker will open a browser window for OAuth consent — the token is cached at `src/worker/personal/token.json`
 6. Set `EMAIL_POLL_INTERVAL_SECONDS` to control how often Gmail is checked (default: every 2 hours)
 
 ## Database Setup
 
-Migrations live in `supabase/migrations/`. To set up the schema:
+Migrations live in `src/supabase/migrations/`. To set up the schema:
 
 1. Open your Supabase project dashboard
 2. Go to **SQL Editor**
-3. Copy and run the contents of `supabase/migrations/0001_initial.sql`
-
-This creates the `search_tasks`, `applications`, and `email_logs` tables with appropriate indexes and Row Level Security policies.
+3. Copy and run each migration in order:
+   - `001_initial_schema.sql` — creates `search_tasks`, `applications`, and `email_logs` tables with RLS policies
+   - `002_add_retry_count.sql` — adds retry tracking columns to `applications`
+   - `003_enable_realtime.sql` — enables Supabase Realtime on relevant tables
+   - `004_add_failure_logs_table.sql` — creates the `failure_logs` table for pipeline error tracking
 
 ## Project Structure
 
@@ -240,56 +250,72 @@ agent-job-finder/
 │   └── workflows/
 │       ├── ci.yml              # Lint, type check, test on PRs
 │       └── security.yml        # pip-audit on PRs and weekly
-├── dashboard/                  # Next.js frontend
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   └── package.json
 ├── docs/                       # Screenshots and assets
-├── supabase/
-│   └── migrations/
-│       └── 0001_initial.sql
-├── worker/
-│   ├── agents/                 # CrewAI agent definitions
-│   │   ├── browser.py
-│   │   ├── email_agent.py      # Gmail classifier + draft reply (optional)
-│   │   ├── evaluator.py
-│   │   ├── field_inspector.py
-│   │   └── searcher.py
-│   ├── db/
-│   │   ├── client.py           # Supabase client singleton
-│   │   └── repository.py       # Data access layer
-│   ├── models/                 # Frozen Pydantic / dataclass models
-│   │   ├── application_packet.py   # ApplicationPacket + ApplicationPackets
-│   │   ├── application_result.py
-│   │   ├── email_log.py
-│   │   ├── inspected_job.py        # InspectedJob + InspectedJobs
-│   │   ├── job_listing.py
-│   │   └── search_criteria.py
-│   ├── personal/               # Gitignored — resume, credentials, personal data
-│   ├── tests/
-│   │   ├── models/
-│   │   ├── tools/
-│   │   ├── test_config.py
-│   │   ├── test_crew.py
-│   │   └── test_repository.py
-│   ├── tools/                  # CrewAI tool implementations
-│   │   ├── browser_tool.py     # Playwright form filler
-│   │   ├── browser_utils.py    # Click-through-to-form helpers
-│   │   ├── field_inspector_tool.py
-│   │   ├── resume_loader.py
-│   │   └── search_tool.py      # DuckDuckGo subprocess search
-│   ├── config.py               # pydantic-settings Settings class
-│   ├── crew.py                 # CrewAI crew factory + run_crew()
-│   ├── logging_config.py       # structlog setup
-│   └── main.py                 # Worker entry point
+├── ops/                        # Deployment, monitoring
+├── planning/                   # Specs and architecture decisions
+├── src/
+│   ├── dashboard/              # Next.js frontend
+│   │   ├── app/
+│   │   │   ├── admin/          # Admin pages (applications, emails, search)
+│   │   │   ├── auth/           # OAuth callback route
+│   │   │   └── login/
+│   │   └── package.json
+│   ├── supabase/
+│   │   └── migrations/
+│   │       ├── 001_initial_schema.sql
+│   │       ├── 002_add_retry_count.sql
+│   │       ├── 003_enable_realtime.sql
+│   │       └── 004_add_failure_logs_table.sql
+│   └── worker/
+│       ├── agents/             # CrewAI agent definitions
+│       │   ├── browser.py
+│       │   ├── cover_letter_writer.py  # Cover letter draft + PDF render
+│       │   ├── email_agent.py
+│       │   ├── evaluator.py
+│       │   ├── field_inspector.py
+│       │   └── searcher.py
+│       ├── db/
+│       │   ├── client.py       # Supabase client singleton
+│       │   └── repository.py   # Data access layer
+│       ├── logging/            # structlog configuration helpers
+│       ├── models/             # Frozen Pydantic models
+│       │   ├── application_packet.py
+│       │   ├── application_result.py
+│       │   ├── email_log.py
+│       │   ├── failure.py          # FailureLog model
+│       │   ├── inspected_job.py
+│       │   ├── job.py
+│       │   ├── job_listing.py
+│       │   └── search_criteria.py
+│       ├── personal/           # Gitignored — resume, credentials, personal data
+│       ├── screenshots/        # Playwright debug screenshots (gitignored)
+│       ├── tests/
+│       │   ├── models/
+│       │   ├── tools/
+│       │   ├── test_config.py
+│       │   ├── test_crew.py
+│       │   └── test_repository.py
+│       ├── tools/              # CrewAI tool implementations
+│       │   ├── browser_tool.py
+│       │   ├── browser_utils.py
+│       │   ├── cover_letter_context_loader.py  # Loads personal context for cover letters
+│       │   ├── cover_letter_renderer.py        # Renders cover letter text to PDF
+│       │   ├── field_inspector_tool.py
+│       │   ├── resume_loader.py
+│       │   ├── search_tool.py
+│       │   └── stealth.py          # Playwright stealth / bot-detection evasion
+│       ├── config.py
+│       ├── crew.py
+│       ├── logging_config.py
+│       └── main.py
 ├── .env.example
 ├── .pre-commit-config.yaml
 ├── CONTRIBUTING.md
-├── HANDOFF.md                  # Session notes and known issues
+├── HANDOFF.md
 ├── LICENSE
+├── main.py                     # Top-level entry point
 ├── pyproject.toml
-├── search_criteria.csv         # Example criteria input
+├── search_criteria.csv
 └── uv.lock
 ```
 
@@ -319,7 +345,7 @@ uv run ruff format .
 **Type check:**
 
 ```bash
-uv run mypy worker/
+uv run mypy src/worker/
 ```
 
 ## Contributing
